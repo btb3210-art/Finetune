@@ -1,0 +1,1327 @@
+<title>악보 인식기</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: three steps down one column — upload, review (original beside recognized score), save. */
+:root{
+  --bg:#eef1f5; --surface:#ffffff; --surface-2:#f5f7fa; --line:#d6dce5;
+  --ink:#141b24; --ink-2:#4a5566; --ink-3:#6f7a8c;
+  --accent:#2b59c3; --accent-ink:#ffffff; --accent-soft:#e3eafb;
+  --paper:#fffffe; --paper-line:#e2e4e8;
+  --good:#1e8a4c; --warn:#a86400; --bad:#c8323c; --warn-soft:#fdf3e1;
+  --f-body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10141a; --surface:#181e27; --surface-2:#1f2631; --line:#2c3543;
+  --ink:#e8edf4; --ink-2:#a9b3c2; --ink-3:#8590a1;
+  --accent:#7d9ef0; --accent-ink:#0d1320; --accent-soft:#223155;
+  --paper:#ecebe6; --paper-line:#c9c8c2;
+  --good:#3fbf75; --warn:#e3a23a; --bad:#f06a6f; --warn-soft:#3a2f1c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10141a; --surface:#181e27; --surface-2:#1f2631; --line:#2c3543;
+  --ink:#e8edf4; --ink-2:#a9b3c2; --ink-3:#8590a1;
+  --accent:#7d9ef0; --accent-ink:#0d1320; --accent-soft:#223155;
+  --paper:#ecebe6; --paper-line:#c9c8c2;
+  --good:#3fbf75; --warn:#e3a23a; --bad:#f06a6f; --warn-soft:#3a2f1c; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--ink)}
+body{font-family:var(--f-body);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
+.wrap{max-width:1480px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+h1,h2,h3{margin:0;text-wrap:balance}
+button,select,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.appbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-block:16px 2px}
+.brand{display:flex;gap:10px;align-items:center}
+.brand svg{width:30px;height:30px;flex:none}
+.brand h1{font-size:20px;font-weight:700}
+.brand small{display:block;color:var(--ink-3);font-size:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px}
+.step{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.step .no{font-family:var(--f-mono);font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-soft);padding:2px 8px;border-radius:99px}
+.step h2{font-size:17px}
+.step p{margin:0;color:var(--ink-3);font-size:13px}
+.drop{border:2px dashed var(--line);border-radius:var(--r);padding:22px;text-align:center;background:var(--surface-2);cursor:pointer;color:var(--ink-2)}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop b{color:var(--ink)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--surface-2);border-radius:8px;padding:8px 14px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--ink-3)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.btn.danger{color:var(--bad)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.sm{padding:4px 10px;font-size:13px}
+.inp{border:1px solid var(--line);background:var(--surface-2);border-radius:8px;padding:6px 8px}
+.inp.n{width:70px;text-align:center;font-family:var(--f-mono)}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--ink-3);font-weight:600}
+.thumbs{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
+.thumb{flex:none;width:120px;display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--ink-2)}
+.thumb img{width:120px;height:160px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:6px}
+.thumb.off img{opacity:.35}
+.thumb .st{font-family:var(--f-mono);font-size:11.5px;min-height:16px}
+.st.run{color:var(--accent)} .st.ok{color:var(--good)} .st.err{color:var(--bad)}
+.note{font-size:13px;color:var(--ink-2);background:var(--surface-2);border-radius:8px;padding:10px 12px}
+.note.err{color:var(--bad)}
+.note.warn{background:var(--warn-soft);color:var(--ink)}
+.review{display:grid;grid-template-columns:minmax(0,0.9fr) minmax(0,1.25fr) minmax(320px,380px);gap:14px;align-items:start}
+.pane{display:flex;flex-direction:column;gap:8px;min-width:0}
+.pane h3{font-size:14px;color:var(--ink-3);font-weight:600}
+.scroll{height:min(70vh,760px);overflow:auto;border:1px solid var(--paper-line);border-radius:var(--r);background:var(--paper);color:#111}
+.orig{display:flex;flex-direction:column;gap:8px;padding:8px}
+.orig img{width:100%;height:auto;display:block;background:#fff}
+#osmd{min-height:120px}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.warns{display:flex;flex-direction:column;gap:4px;margin:0;padding:0;list-style:none;font-size:13px}
+.warns li{padding:6px 10px;border-radius:6px;background:var(--warn-soft)}
+.warns li b{font-family:var(--f-mono)}
+textarea#nota{width:100%;min-height:260px;font-family:var(--f-mono);font-size:13px;line-height:1.6;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);padding:10px;resize:vertical}
+details summary{cursor:pointer;font-weight:600;font-size:14px}
+.legend{font-size:12.5px;color:var(--ink-3);line-height:1.7}
+.legend code{font-family:var(--f-mono);background:var(--surface-2);padding:0 4px;border-radius:4px;color:var(--ink-2)}
+.timer{font-family:var(--f-mono);font-variant-numeric:tabular-nums;color:var(--ink-3);font-size:13px}
+.foot{font-size:12.5px;color:var(--ink-3)}
+.editbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px;border:1px solid var(--accent);background:var(--accent-soft);border-radius:8px;font-size:13px}
+.editbar .sel{font-weight:700;min-width:150px}
+.editbar .grp{display:flex;gap:2px}
+.editbar button{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:4px 9px;cursor:pointer;min-width:32px}
+.editbar button:hover{border-color:var(--accent)}
+.editbar select{padding:4px 6px}
+.editbar label{display:inline-flex;gap:4px;align-items:center;white-space:nowrap}
+.hint{font-size:12.5px;color:var(--ink-3)}
+.warns li{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.warns li .txt{flex:1;min-width:0}
+.warns li .btn{padding:2px 10px;font-size:12.5px;background:var(--surface)}
+.reread-msg{font-size:13px}
+svg rect.mhot{fill:transparent;transition:fill .12s}
+svg rect.mhot.hov{fill:rgba(43,89,195,.10)}
+svg rect.mhot.playing{fill:rgba(43,89,195,.16)}
+svg rect.mhot.tap1{fill:rgba(43,89,195,.18)}
+svg rect.mhot.tap2{fill:rgba(43,89,195,.30)}
+#osmd svg{user-select:none;-webkit-user-select:none}
+/* problem log column */
+.logpane .loghead{display:flex;align-items:center;gap:8px}
+.logpane .count{font-family:var(--f-mono);font-size:12px;font-weight:600;padding:1px 8px;border-radius:99px;background:var(--warn-soft);color:var(--warn)}
+.logpane .count.zero{background:var(--surface-2);color:var(--good)}
+.logbox{height:min(70vh,760px);overflow:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:8px;display:flex;flex-direction:column;gap:8px}
+.logbox .note{font-size:12.5px;padding:8px 10px}
+.logbox .warns li{flex-direction:column;align-items:stretch;gap:6px;cursor:pointer;border:1px solid transparent}
+.logbox .warns li:hover{border-color:var(--warn)}
+.logbox .warns li.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.logbox .warns li .issue{font-size:12.5px;line-height:1.45}
+.logbox .warns li .acts{display:flex;gap:6px;flex-wrap:wrap}
+.logbox .warns li.ok{background:var(--surface-2);cursor:default}
+.logbox .tools{margin-top:auto;display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);padding-top:8px}
+.fixbox{display:flex;flex-direction:column;gap:6px;padding:10px;border:1px solid var(--accent);border-radius:8px;background:var(--accent-soft)}
+.fixbox .row{gap:6px}
+.fixbox b{font-size:13px}
+.fixin,#fixText{width:100%;font-family:var(--f-mono);font-size:12.5px;padding:6px 8px}
+.fixin.bad,#fixText.bad{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad) inset}
+.fixerr{font-size:12px;color:var(--bad)}
+.readout{font-size:12px;line-height:1.5;color:var(--ink-2);background:var(--surface);border-radius:6px;padding:6px 8px;min-height:20px}
+.readout .bad{color:var(--bad);font-weight:700}
+.readout .sum{color:var(--ink-3)}
+.builder,.cheat{display:flex;flex-direction:column;gap:6px;background:var(--surface);border-radius:6px;padding:8px}
+.builder .row{gap:4px}
+.builder select{padding:4px 4px;font-size:12.5px}
+.builder label{display:inline-flex;gap:3px;align-items:center;font-size:12.5px}
+.bt{font-size:12px;font-weight:700;color:var(--ink-2)}
+.bt span{font-weight:400;color:var(--ink-3);margin-left:4px}
+.cheat dl{display:grid;grid-template-columns:auto 1fr;gap:3px 8px;margin:0;font-size:12px;line-height:1.45}
+.cheat dt{color:var(--ink-3);font-weight:600;white-space:nowrap}
+.cheat dd{margin:0;color:var(--ink-2)}
+.cheat code,.readout code{font-family:var(--f-mono);background:var(--surface-2);padding:0 3px;border-radius:3px;color:var(--ink)}
+.fixbox details summary{font-size:12px;color:var(--ink-3);font-weight:600}
+.fixbox .legend{font-size:11.5px;margin-top:4px}
+.logbox .warns li .fix{display:flex;gap:4px;align-items:center}
+.logbox .warns li .fix .btn{flex:none}
+.lib-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.lib-item{display:flex;gap:10px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);align-items:center;min-width:0}
+.lib-item.cur{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.lib-item img,.lib-item .noimg{width:48px;height:64px;object-fit:cover;object-position:top;background:#fff;border:1px solid var(--line);border-radius:4px;flex:none}
+.lib-item .meta{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.lib-item .t{font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lib-item .d{font-size:12px;color:var(--ink-3)}
+.lib-item .acts{display:flex;gap:4px;margin-top:4px}
+.lib-item .acts .btn{padding:3px 9px;font-size:12.5px}
+.savebar{display:flex;gap:8px;align-items:center;margin-left:auto}
+.savestate{font-size:12.5px;color:var(--ink-3)}
+.savestate.ok{color:var(--good)} .savestate.err{color:var(--bad)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:var(--surface-2);padding:5px 12px;font-size:13px;cursor:pointer;color:var(--ink-2)}
+.seg button.on{background:var(--accent);color:var(--accent-ink);font-weight:700}
+#osmdFull{min-height:120px}
+@media (max-width:1180px){ .review{grid-template-columns:minmax(0,1fr) minmax(0,1.3fr)} .logpane{grid-column:1/-1} .logbox{height:auto;max-height:320px} }
+@media (max-width:860px){ .review{grid-template-columns:minmax(0,1fr)} .scroll{height:56vh} }
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="appbar">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="8" fill="var(--accent)"/><g stroke="var(--accent-ink)" stroke-width="1.4" opacity=".55"><line x1="6" y1="10" x2="26" y2="10"/><line x1="6" y1="14" x2="26" y2="14"/><line x1="6" y1="18" x2="26" y2="18"/><line x1="6" y1="22" x2="26" y2="22"/></g><rect x="5" y="5" width="22" height="22" rx="3" fill="none" stroke="var(--accent-ink)" stroke-width="1.6" stroke-dasharray="4 3"/><ellipse cx="14" cy="19" rx="3.4" ry="2.5" fill="var(--accent-ink)" transform="rotate(-20 14 19)"/><rect x="16.5" y="8" width="1.7" height="11" fill="var(--accent-ink)"/></svg>
+      <div><h1>악보 인식기</h1><small>사진·PDF 악보 → 연습 코치용 MusicXML</small></div>
+    </div>
+  </header>
+
+  <section class="card" id="libCard">
+    <div class="step"><h2>내 악보함</h2><p id="libSub">고친 악보와 올린 원본을 저장해 두고 다시 열 수 있어요.</p><span style="flex:1"></span><button class="btn sm" id="newBtn" hidden>새 악보 시작</button></div>
+    <div class="lib-list" id="libList"><div class="note">불러오는 중…</div></div>
+  </section>
+
+  <section class="card" id="step1">
+    <div class="step"><span class="no">1</span><h2>악보 올리기</h2><p>PDF 여러 쪽이나 사진 여러 장을 한 번에 올릴 수 있어요. 쪽마다 Claude가 음표를 읽습니다. MuseScore 등에서 만든 MusicXML(.mxl·.musicxml)은 인식 없이 바로 열려요.</p></div>
+    <label class="drop" id="drop" for="fileIn"><b>여기를 눌러 파일 선택</b> 또는 끌어다 놓기<br><span style="font-size:13px">PDF · JPG · PNG · 휴대폰으로 찍은 사진 · MusicXML(.mxl · .musicxml · .xml)</span></label>
+    <input type="file" id="fileIn" accept=".pdf,image/*,.mxl,.musicxml,.xml" multiple hidden>
+    <div class="thumbs" id="thumbs"></div>
+    <div class="row">
+      <label class="f">읽을 보표
+        <select class="inp" id="staff">
+          <option value="top">맨 위 보표 (멜로디·독주 악기)</option>
+          <option value="bottom">맨 아래 보표 (반주 왼손 등)</option>
+          <option value="only">한 줄 악보</option>
+        </select>
+      </label>
+      <label class="f">악기 (선택)
+        <input class="inp" id="instName" placeholder="예: 바이올린, 클라리넷" style="width:170px">
+      </label>
+      <span style="flex:1"></span>
+      <span class="timer" id="timer"></span>
+      <button class="btn danger" id="stopBtn" hidden>멈추기</button>
+      <button class="btn primary" id="runBtn" disabled>음표 인식 시작</button>
+    </div>
+    <div class="note" id="msg1">악보를 올리면 쪽마다 미리보기가 보입니다. 인식할 쪽만 남기려면 미리보기를 눌러 빼세요.</div>
+  </section>
+
+  <section class="card" id="step2" hidden>
+    <div class="step"><span class="no">2</span><h2>원본과 비교하며 확인</h2><p>오른쪽 문제 로그에서 마디를 누르면 악보의 그 자리로 가요. 틀린 음표는 악보에서 눌러 고치고, 마디째 틀렸다면 [다시 인식]을 누르세요.</p><div class="savebar"><span class="savestate" id="saveState"></span><button class="btn primary" id="libSave">악보함에 저장</button></div></div>
+    <div class="review">
+      <div class="pane"><div class="toolbar"><div class="seg" id="leftSeg"><button class="on" id="vOrig">원본</button><button id="vFull" hidden>전체 스코어</button></div><span style="margin-right:auto"></span><label class="btn sm" for="origIn" title="인식은 다시 하지 않고 비교용으로만 원본을 넣어요">원본 올리기</label><input type="file" id="origIn" accept=".pdf,image/*" multiple hidden></div><div class="scroll" id="origScroll"><div class="orig" id="orig"></div></div><div class="scroll" id="fullScroll" hidden><div id="osmdFull"></div></div></div>
+      <div class="pane">
+        <div class="toolbar">
+          <h3>인식한 악보</h3><select class="inp" id="partSel" hidden aria-label="편집할 파트" title="편집·연습할 파트" style="max-width:190px"></select><span style="margin-right:auto"></span>
+          <label class="f" style="flex-direction:row;align-items:center;gap:6px">♩= <input class="inp n" id="bpm" type="number" min="20" max="300" value="80"></label>
+          <label class="f" style="flex-direction:row;align-items:center;gap:6px" title="이 마디부터 예시를 들려줍니다. 음표를 누르면 그 마디로 바뀌어요."><input class="inp n" id="fromM" type="number" min="0" value="1"> 마디부터</label>
+          <button class="btn" id="undoBtn" title="방금 고친 것 되돌리기 (Ctrl+Z)" disabled>↶ 되돌리기</button>
+          <select class="inp" id="demoCI" aria-label="예비박" title="예시 듣기 전에 칠 예비박" style="padding:6px 4px"><option value="0">예비박 없이</option><option value="1">예비박 1마디</option></select>
+          <button class="btn" id="playBtn">▶ 예시 듣기</button>
+        </div>
+        <div class="hint" id="editHint">오선 빈 곳 세 번: 그 마디부터 듣기 · 한 번: 정지 · 음표 누르기: 고치기 (↑↓ 음 높이, Shift+↑↓ 옥타브, Delete 삭제)</div>
+        <div class="editbar" id="editBar" hidden>
+          <span class="sel" id="selInfo"></span>
+          <div class="grp"><button data-act="up" title="한 음 위 (↑)">▲</button><button data-act="down" title="한 음 아래 (↓)">▼</button></div>
+          <div class="grp"><button data-act="sharp" title="올림">♯</button><button data-act="nat" title="제자리">♮</button><button data-act="flat" title="내림">♭</button></div>
+          <div class="grp"><button data-act="octup" title="한 옥타브 위 (Shift+↑)">8↑</button><button data-act="octdown" title="한 옥타브 아래 (Shift+↓)">8↓</button></div>
+          <select class="inp" id="durSel" aria-label="음표 길이"><option value="w">온음표</option><option value="h">2분음표</option><option value="q">4분음표</option><option value="e">8분음표</option><option value="s">16분음표</option><option value="t">32분음표</option><option value="M">온마디 쉼표</option></select>
+          <label><input type="checkbox" id="dotChk"> 점</label>
+          <label><input type="checkbox" id="tripChk"> 셋잇단</label>
+          <label><input type="checkbox" id="tieChk"> 붙임줄</label>
+          <div class="grp"><button data-act="rest">쉼표↔음표</button><button data-act="dup" title="이 음표 뒤에 같은 음표를 하나 더">뒤에 추가</button><button data-act="del" title="Delete">삭제</button></div>
+          <button data-act="reread" title="이 마디만 Claude에게 다시 읽게 하기">이 마디 다시 인식</button>
+          <button data-act="close" title="Esc">닫기</button>
+        </div>
+        <div class="scroll" id="scoreScroll"><div id="osmd"></div></div>
+      </div>
+      <div class="pane logpane">
+        <div class="loghead"><h3>문제 로그</h3><span class="count" id="warnCount">0</span></div>
+        <div class="logbox">
+          <div class="fixbox">
+            <div class="row"><b>마디 고치기</b><input class="inp n" id="fixNum" type="number" min="0" aria-label="고칠 마디 번호"><span style="font-size:13px">마디</span></div>
+            <input class="inp" id="fixText" spellcheck="false" placeholder="예: G4:q A4:e B4:e C5:h  (아래 도우미로도 넣을 수 있어요)" aria-label="마디 음표 표기">
+            <div class="row"><button class="btn sm" id="fixApply">적용 (Enter)</button><span class="fixerr" id="fixErr"></span></div>
+            <label style="display:flex;gap:6px;align-items:center;font-size:12.5px"><input type="checkbox" id="pickupChk"> 첫 마디는 못갖춘마디 (0마디로 셈)</label>
+            <div class="readout" id="fixRead" aria-live="polite"></div>
+            <div class="builder">
+              <div class="bt">음표 넣기 도우미 <span>고르고 [넣기]를 누르면 위 칸 끝에 붙어요</span></div>
+              <div class="row">
+                <select class="inp" id="bStep" aria-label="음 이름"><option value="C">도 (C)</option><option value="D">레 (D)</option><option value="E">미 (E)</option><option value="F">파 (F)</option><option value="G" selected>솔 (G)</option><option value="A">라 (A)</option><option value="B">시 (B)</option><option value="r">쉼표</option></select>
+                <select class="inp" id="bOct" aria-label="옥타브"><option value="2">2 (낮음)</option><option value="3">3</option><option value="4" selected>4 (가온 도~)</option><option value="5">5</option><option value="6">6 (높음)</option></select>
+                <select class="inp" id="bAcc" aria-label="올림 내림"><option value="key">조표대로</option><option value="0">♮ 제자리</option><option value="1">♯ 올림</option><option value="-1">♭ 내림</option></select>
+              </div>
+              <div class="row">
+                <select class="inp" id="bDur" aria-label="길이"><option value="w">온음표</option><option value="h">2분음표</option><option value="q" selected>4분음표</option><option value="e">8분음표</option><option value="s">16분음표</option><option value="t">32분음표</option><option value="M">온마디 쉼표</option></select>
+                <label><input type="checkbox" id="bDot"> 점</label><label><input type="checkbox" id="bTrip"> 셋잇단</label><label><input type="checkbox" id="bTie"> 붙임줄</label>
+              </div>
+              <div class="row"><button class="btn sm" id="bAdd">넣기</button><button class="btn sm" id="bBack">마지막 음 지우기</button><button class="btn sm" id="bClear">칸 비우기</button></div>
+            </div>
+            <div class="cheat">
+              <div class="bt">표기법 한눈에 보기</div>
+              <dl>
+                <dt>모양</dt><dd><code>음이름 옥타브 : 길이</code> 를 띄어쓰기로 나열 · 예 <code>G4:q</code> = 솔 4분음표</dd>
+                <dt>음이름</dt><dd><code>C</code>도 <code>D</code>레 <code>E</code>미 <code>F</code>파 <code>G</code>솔 <code>A</code>라 <code>B</code>시</dd>
+                <dt>옥타브</dt><dd>가온 도 = <code>C4</code>, 한 옥타브 위 도 = <code>C5</code> (높은음자리표 둘째 줄 솔 = <code>G4</code>)</dd>
+                <dt>올림·내림</dt><dd><code>F#4</code> 파♯ · <code>Bb4</code> 시♭ · 조표에 붙은 ♯♭도 적어요</dd>
+                <dt>길이</dt><dd><code>w</code> 온 · <code>h</code> 2분 · <code>q</code> 4분 · <code>e</code> 8분 · <code>s</code> 16분 · <code>t</code> 32분</dd>
+                <dt>꾸밈</dt><dd>점 <code>q.</code> · 셋잇단 <code>e3</code> · 붙임줄(다음 음과 이음) <code>h~</code></dd>
+                <dt>쉼표</dt><dd><code>r:q</code> 4분 쉼표 · <code>r:e</code> 8분 쉼표 · <code>r:M</code> 온마디 쉼표</dd>
+                <dt>예시</dt><dd><code>G4:q A4:e B4:e C5:h</code><br>= 솔 4분 · 라 8분 · 시 8분 · 도 2분</dd>
+              </dl>
+            </div>
+          </div>
+          <div class="note reread-msg" id="rereadMsg" hidden></div>
+          <ul class="warns" id="warns"></ul>
+          <div class="tools">
+            <div class="note" id="sumNote"></div>
+            <button class="btn sm" id="openText">텍스트로 한꺼번에 고치기</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <details id="editBox">
+      <summary>직접 고치기 (한 줄 = 한 마디)</summary>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+        <textarea id="nota" spellcheck="false" aria-label="인식 결과 텍스트"></textarea>
+        <div class="legend">
+          음표는 <code>음이름+옥타브:길이</code>. 가온 도 = <code>C4</code>, 올림 <code>#</code>, 내림 <code>b</code> (조표까지 반영한 실제 음으로 적기).
+          길이: <code>w</code> 온 · <code>h</code> 2분 · <code>q</code> 4분 · <code>e</code> 8분 · <code>s</code> 16분 · <code>t</code> 32분, 점음표 <code>q.</code>, 셋잇단 <code>e3</code>, 붙임줄 <code>q~</code>.
+          쉼표 <code>r:q</code>, 온마디 쉼표 <code>r:M</code>. 마디 중간 변경: <code>{time=3/4}</code> <code>{key=-2}</code> <code>{clef=F}</code>.
+        </div>
+        <div class="row"><button class="btn" id="applyBtn">고친 내용으로 다시 그리기</button><span class="note" id="applyMsg" style="padding:4px 10px" hidden></span></div>
+      </div>
+    </details>
+  </section>
+
+  <section class="card" id="step3" hidden>
+    <div class="step"><span class="no">3</span><h2>저장하기</h2><p>인쇄·공유용은 PDF나 이미지로, 연습용은 MusicXML로 저장하세요. MusicXML로 저장한 뒤 연습 코치의 [악보 열기]로 열면 악기 소리 예시, 튜너, 음정·박자 분석을 모두 쓸 수 있어요.</p></div>
+    <div class="row">
+      <label class="f">파일 이름 <input class="inp" id="fname" style="width:240px"></label>
+      <label class="f" id="expWhatBox" hidden>PDF·이미지로 내보낼 것 <select class="inp" id="expWhat"><option value="part">편집한 파트</option><option value="full">전체 스코어 (불러온 파일)</option></select></label>
+      <span style="flex:1"></span>
+      <button class="btn" id="pngBtn" title="악보를 그림 파일 한 장으로 (여러 쪽이면 세로로 이어 붙임)">이미지(PNG) 저장</button>
+      <button class="btn" id="pdfBtn" title="A4 크기 PDF로 인쇄용 저장">PDF 저장</button>
+      <button class="btn" id="copyBtn">MusicXML 복사</button>
+      <button class="btn primary" id="saveBtn">MusicXML 저장</button>
+    </div>
+    <div class="note" id="saveMsg" hidden></div>
+  </section>
+
+  <p class="foot">인식은 이 페이지를 연 사람의 Claude 계정으로 실행되며 쪽마다 30초~2분쯤 걸립니다. 단선율(한 성부)만 읽고, 화음은 가장 높은 음, 꾸밈음·가사·셈여림은 뺍니다. 손글씨나 흐린 사진은 틀리기 쉬우니 원본과 꼭 비교해 주세요.</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.9.9/build/opensheetmusicdisplay.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+(function(){
+"use strict";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let sample = null, downloads = null, imgLimits = null, dbCap = null, userCap = null, assetsCap = null, store = null;
+const pages = []; // {name, blob, url, use, status}
+let osmd = null, current = null; // current = parsed score {meta, measures}
+let runCtl = null, usedPages = [];
+
+/* ---------- capabilities ---------- */
+(async () => {
+  try { if (window.claude && claude.use) {
+    [sample, downloads, dbCap, userCap, assetsCap] = await Promise.all(['sample','downloads','db','user','assets'].map(n => claude.use(n)));
+    if (sample) { const lim = await sample.limits().catch(() => null); imgLimits = lim && lim.images ? lim.images : null; }
+  } } catch(e) {}
+  if (!sample || !imgLimits) { $('msg1').textContent = '이 화면에서는 Claude 음표 인식을 쓸 수 없어요. claude.ai에 로그인한 상태로 이 페이지를 열어 주세요. 아래 \'직접 고치기\'로 손으로 입력하는 것은 가능합니다.'; $('msg1').classList.add('err'); }
+  if (!downloads) { $('saveBtn').hidden = true; }
+  updateRun();
+  try { if (dbCap && userCap) { const uid = await userCap.id(); if (uid) store = cloudStore(uid); } } catch(e) {}
+  if (!store) store = localStore();
+  renderLibrary();
+})();
+
+/* ---------- loading files ---------- */
+const drop = $('drop');
+['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => handleFiles(e.dataTransfer.files));
+$('fileIn').addEventListener('change', e => { handleFiles(e.target.files); e.target.value = ''; });
+
+async function canvasToBlob(cv){
+  const maxB = imgLimits ? imgLimits.maxBytes : 4.5e6;
+  const types = imgLimits ? imgLimits.mediaTypes : ['image/png','image/jpeg'];
+  let b = types.includes('image/png') ? await new Promise(r => cv.toBlob(r, 'image/png')) : null;
+  if (!b || b.size > maxB) b = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.9));
+  let q = 0.85; let c = cv;
+  while (b.size > maxB && q > 0.4) {               // shrink until it fits the per-image limit
+    const s = document.createElement('canvas'); s.width = Math.round(c.width*0.85); s.height = Math.round(c.height*0.85);
+    s.getContext('2d').drawImage(c, 0, 0, s.width, s.height); c = s; b = await new Promise(r => c.toBlob(r, 'image/jpeg', q)); q -= 0.1;
+  }
+  return b;
+}
+async function filesToPages(list, errEl){
+  const out = [];
+  for (const f of [...list]) {
+    const base = f.name.replace(/\.[^.]+$/, '');
+    try {
+      if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) {
+        const pdf = await pdfjsLib.getDocument({ data: await f.arrayBuffer() }).promise;
+        for (let p = 1; p <= pdf.numPages; p++) {
+          const page = await pdf.getPage(p); const v1 = page.getViewport({ scale: 1 });
+          const vp = page.getViewport({ scale: Math.min(2200 / v1.width, 4) });
+          const cv = document.createElement('canvas'); cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+          const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height);
+          await page.render({ canvasContext: g, viewport: vp }).promise;
+          out.push(mkPage(`${base} ${p}쪽`, await canvasToBlob(cv), base));
+        }
+      } else {
+        const bmp = await createImageBitmap(f);
+        const sc = Math.min(1, 2400 / Math.max(bmp.width, bmp.height));
+        const cv = document.createElement('canvas'); cv.width = Math.round(bmp.width*sc); cv.height = Math.round(bmp.height*sc);
+        const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0,0,cv.width,cv.height); g.drawImage(bmp, 0, 0, cv.width, cv.height);
+        out.push(mkPage(base, await canvasToBlob(cv), base));
+      }
+    } catch (e) { console.error(e); if (errEl) { errEl.textContent = `${f.name}을(를) 열지 못했어요.`; errEl.classList.add('err'); } }
+  }
+  return out;
+}
+async function handleFiles(list){
+  const all = [...list]; const scoreFiles = all.filter(isScoreFile);
+  if (scoreFiles.length) { await importScoreFile(scoreFiles[0]); list = all.filter(f => !isScoreFile(f)); if (!list.length) return; }
+  for (const p of await filesToPages(list, $('msg1'))) { pages.push(p); if (!$('fname').value) $('fname').value = p.base; }
+  renderThumbs(); updateRun();
+}
+function mkPage(name, blob, base){ return { name, blob, url: URL.createObjectURL(blob), use: true, status: '', base }; }
+
+function addPage(name, blob, base){
+  pages.push({ name, blob, url: URL.createObjectURL(blob), use: true, status: '', base });
+  if (!$('fname').value) $('fname').value = base;
+}
+function renderThumbs(){
+  $('thumbs').innerHTML = pages.map((p, i) => `<div class="thumb ${p.use ? '' : 'off'}" data-i="${i}" title="눌러서 인식에 넣기/빼기"><img src="${p.url}" alt="${esc(p.name)}"><span>${esc(p.name)}</span><span class="st ${p.cls || ''}">${esc(p.use ? p.status : '제외됨')}</span></div>`).join('');
+  [...$('thumbs').children].forEach(el => el.onclick = () => { if (runCtl) return; const p = pages[+el.dataset.i]; p.use = !p.use; renderThumbs(); updateRun(); });
+  if (pages.length && sample && imgLimits) $('msg1').textContent = `${pages.filter(p=>p.use).length}쪽을 인식합니다. 쪽 순서는 올린 순서대로예요.`, $('msg1').classList.remove('err');
+}
+function updateRun(){ $('runBtn').disabled = !sample || !imgLimits || !pages.some(p => p.use) || !!runCtl; }
+
+/* ---------- original pages for comparison (kept in this browser) ---------- */
+function renderOrig(){
+  $('orig').innerHTML = usedPages.length ? usedPages.map(p => `<img src="${p.url}" alt="${esc(p.name)}">`).join('')
+    : '<div class="drop" id="origDrop" style="margin:8px"><b>원본 악보가 없어요</b><br><span style="font-size:13px">[원본 올리기]를 누르거나 여기로 PDF·사진을 끌어다 놓으면 인식한 악보와 나란히 비교할 수 있어요. 인식은 다시 하지 않아요.</span></div>';
+  const d = $('origDrop'); if (d) d.onclick = () => $('origIn').click();
+}
+async function setOriginal(files){
+  const got = await filesToPages(files, null); if (!got.length) return;
+  usedPages = got; renderOrig(); saveOrigPages();
+  if (lastA) showScore(false);      // re-draw the log so [다시 인식] appears
+}
+$('origIn').addEventListener('change', e => { setOriginal(e.target.files); e.target.value = ''; });
+$('origScroll').addEventListener('dragover', e => e.preventDefault());
+$('origScroll').addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer.files.length) setOriginal(e.dataTransfer.files); });
+function idb(){ return new Promise((res, rej) => { const r = indexedDB.open('omr-pages', 2); r.onupgradeneeded = () => { const d = r.result; if (!d.objectStoreNames.contains('kv')) d.createObjectStore('kv'); if (!d.objectStoreNames.contains('lib')) d.createObjectStore('lib', { keyPath: 'id' }); }; r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+async function saveOrigPages(){ try { const db = await idb(); const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').put(usedPages.map(p => ({ name: p.name, blob: p.blob, base: p.base })), 'last'); } catch(e) {} }
+async function loadOrigPages(){ try { const db = await idb(); return await new Promise(res => { const r = db.transaction('kv').objectStore('kv').get('last'); r.onsuccess = () => res((r.result || []).map(p => mkPage(p.name, p.blob, p.base))); r.onerror = () => res([]); }); } catch(e) { return []; } }
+
+
+/* ---------- MusicXML import (no recognition needed) ---------- */
+let importedXML = null, importedParts = [], importedDoc = null, fullOsmd = null, fullDirty = true;
+const isScoreFile = (f) => /\.(mxl|musicxml|xml)$/i.test(f.name);
+async function unzipMxl(buf){
+  const u8 = new Uint8Array(buf), dv = new DataView(buf), dec = new TextDecoder();
+  let e = u8.length - 22; while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+  if (e < 0) throw new Error('not a zip');
+  const n = dv.getUint16(e + 10, true); let p = dv.getUint32(e + 16, true); const files = {};
+  for (let i = 0; i < n; i++) {
+    const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true), xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), lho = dv.getUint32(p + 42, true);
+    files[dec.decode(u8.subarray(p + 46, p + 46 + nl))] = { method, csize, lho }; p += 46 + nl + xl + cl;
+  }
+  const read = async (f) => {
+    const nl = dv.getUint16(f.lho + 26, true), xl = dv.getUint16(f.lho + 28, true), st = f.lho + 30 + nl + xl; const data = u8.subarray(st, st + f.csize);
+    if (f.method === 0) return dec.decode(data);
+    const out = await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer(); return dec.decode(out);
+  };
+  let root = null;
+  if (files['META-INF/container.xml']) { const c = new DOMParser().parseFromString(await read(files['META-INF/container.xml']), 'application/xml'); const rf = c.querySelector('rootfile'); if (rf) root = rf.getAttribute('full-path'); }
+  if (!root || !files[root]) root = Object.keys(files).find(k => !k.startsWith('META-INF') && /\.(xml|musicxml)$/i.test(k));
+  if (!root) throw new Error('no score in mxl');
+  return read(files[root]);
+}
+const TYPE_CODE = { whole:'w', half:'h', quarter:'q', eighth:'e', '16th':'s', '32nd':'t' };
+const CODE_Q = { w:4, h:2, q:1, e:0.5, s:0.25, t:0.125 };
+function partToModel(doc, pi){
+  const parts = [...doc.querySelectorAll('score-partwise > part')]; const part = parts[pi]; if (!part) throw new Error('no part');
+  const meta = { title: (doc.querySelector('work > work-title')?.textContent || doc.querySelector('movement-title')?.textContent || '').trim(), composer: (doc.querySelector('identification > creator[type="composer"]')?.textContent || '').trim(), clef:'G', key:0, time:'4/4', tempo:null, pickup:false };
+  const snd = part.querySelector('sound[tempo]') || doc.querySelector('sound[tempo]'); if (snd) meta.tempo = Math.round(parseFloat(snd.getAttribute('tempo'))) || null;
+  let divisions = 1, mainVoice = null, curKey = null, curTime = null, curClef = null;
+  const measures = [];
+  [...part.querySelectorAll(':scope > measure')].forEach((m, mi) => {
+    const x = { notes:'', time:null, key:null, clef:null, unsure:false, page:1 }; const toks = []; let lastNote = null;
+    if (mi === 0 && m.getAttribute('implicit') === 'yes') meta.pickup = true;
+    for (const el of m.children) {
+      if (el.tagName === 'attributes') {
+        const d = el.querySelector('divisions'); if (d) divisions = parseFloat(d.textContent) || divisions;
+        const k = el.querySelector('key > fifths'); if (k) { const v = parseInt(k.textContent, 10); if (mi === 0 && curKey === null) meta.key = v; else if (v !== curKey) x.key = v; curKey = v; }
+        const t = el.querySelector('time'); if (t && t.querySelector('beats')) { const v = `${t.querySelector('beats').textContent.trim()}/${t.querySelector('beat-type').textContent.trim()}`; if (mi === 0 && curTime === null) meta.time = normTime(v) || '4/4'; else if (v !== curTime) x.time = normTime(v); curTime = v; }
+        const c = [...el.querySelectorAll('clef')].find(c => !c.getAttribute('number') || c.getAttribute('number') === '1'); if (c) { const v = normClef(c.querySelector('sign')?.textContent || 'G'); if (mi === 0 && curClef === null) meta.clef = v; else if (v !== curClef) x.clef = v; curClef = v; }
+      }
+      if (el.tagName !== 'note') continue;
+      if (el.querySelector('grace') || el.querySelector('cue')) continue;
+      const staff = el.querySelector('staff')?.textContent; if (staff && staff !== '1') continue;
+      const voice = el.querySelector('voice')?.textContent || '1'; if (mainVoice === null) mainVoice = voice; if (voice !== mainVoice) continue;
+      const isChord = !!el.querySelector('chord');
+      const rest = el.querySelector('rest');
+      const typ = el.querySelector('type')?.textContent; let code = TYPE_CODE[typ];
+      const dots = el.querySelectorAll('dot').length;
+      const tm = el.querySelector('time-modification'); const trip = !!(tm && tm.querySelector('actual-notes')?.textContent === '3' && tm.querySelector('normal-notes')?.textContent === '2');
+      if (!code) { const q = (parseFloat(el.querySelector('duration')?.textContent || '0') / divisions); code = Object.keys(CODE_Q).reduce((a, b) => Math.abs(CODE_Q[b] - q) < Math.abs(CODE_Q[a] - q) ? b : a, 'q'); }
+      let tok;
+      if (rest) tok = (rest.getAttribute('measure') === 'yes' || !typ) ? 'r:M' : tokStr({ p:null, d:code, dots, trip, tie:false });
+      else {
+        const pe = el.querySelector('pitch'); if (!pe) continue;   // unpitched (drums)
+        const p = { step: pe.querySelector('step').textContent.trim(), alter: Math.round(parseFloat(pe.querySelector('alter')?.textContent || '0')), oct: parseInt(pe.querySelector('octave').textContent, 10) };
+        const tie = [...el.querySelectorAll('tie')].some(t => t.getAttribute('type') === 'start');
+        if (isChord && lastNote) { if (midiOf(p) > midiOf(lastNote.p)) { lastNote.p = p; toks[toks.length - 1] = tokStr(lastNote); } continue; }
+        lastNote = { p, d: code, dots, trip, tie };
+        tok = tokStr(lastNote); toks.push(tok); continue;
+      }
+      if (isChord) continue;
+      lastNote = null; toks.push(tok);
+    }
+    x.notes = toks.join(' '); measures.push(x);
+  });
+  return { meta, measures, remarks: [] };
+}
+async function importScoreFile(f){
+  const msg = $('msg1'); msg.classList.remove('err');
+  try {
+    const xml = /\.mxl$/i.test(f.name) ? await unzipMxl(await f.arrayBuffer()) : await f.text();
+    const doc = new DOMParser().parseFromString(xml, 'application/xml');
+    if (doc.querySelector('parsererror') || !doc.querySelector('score-partwise')) throw new Error('not partwise');
+    importedXML = xml; importedDoc = doc; fullDirty = true;
+    importedParts = [...doc.querySelectorAll('part-list > score-part')].map(sp => (sp.querySelector('part-name')?.textContent || sp.id).trim());
+    const sel = $('partSel'); sel.innerHTML = importedParts.map((n, i) => `<option value="${i}">${i + 1}. ${esc(n)}</option>`).join(''); sel.hidden = importedParts.length < 2;
+    let pi = [...doc.querySelectorAll('score-partwise > part')].findIndex(p => p.querySelector('pitch')); if (pi < 0) pi = 0; sel.value = pi;
+    curRecId = null; markSaved('', ''); $('libSave').textContent = '악보함에 저장';
+    usedPages = []; renderOrig();
+    $('fname').value = f.name.replace(/\.[^.]+$/, ''); delete $('fname').dataset.touched;
+    await loadPart(pi, true);
+    $('vFull').hidden = false; $('expWhatBox').hidden = false; showLeft('full');
+    msg.textContent = `${f.name}을(를) 바로 열었어요${importedParts.length > 1 ? ` · 파트 ${importedParts.length}개 (악보 위 파트 칸에서 편집할 파트를 고르세요)` : ''}. 인식 사용량은 들지 않아요.`;
+  } catch (e) { console.error(e); msg.classList.add('err'); msg.textContent = `${f.name}을(를) 읽지 못했어요. MusicXML(partwise) 파일인지 확인해 주세요.`; }
+}
+async function loadPart(pi, first){
+  const sc = partToModel(importedDoc, pi);
+  if (!sc.meta.title) sc.meta.title = $('fname').value;
+  stopPlay(); sel = null; $('editBar').hidden = true;
+  if (!first) pushUndo();
+  current = sc; $('nota').value = toText(current); saveDraft();
+  await showScore(!!first);
+  if (!sc.measures.some(m => /[A-G]/.test(m.notes))) $('rereadMsg').hidden = false, $('rereadMsg').textContent = '이 파트에는 음 높이가 있는 음표가 없어요 (타악기 등). 다른 파트를 골라 주세요.';
+}
+$('partSel').addEventListener('change', () => loadPart(+$('partSel').value, false));
+function showLeft(which){
+  const full = which === 'full';
+  $('vOrig').classList.toggle('on', !full); $('vFull').classList.toggle('on', full);
+  $('origScroll').hidden = full; $('fullScroll').hidden = !full;
+  if (full && fullDirty && importedXML) renderFull();
+}
+async function renderFull(){
+  if (!fullOsmd) fullOsmd = new opensheetmusicdisplay.OpenSheetMusicDisplay($('osmdFull'), { autoResize:false, backend:'svg', drawTitle:true, drawPartNames:true, drawPartAbbreviations:true, autoBeam:true, drawingParameters:'compacttight' });
+  try { await fullOsmd.load(importedXML); fullOsmd.zoom = 0.6; fullOsmd.render(); fullDirty = false; }
+  catch(e) { console.error(e); $('osmdFull').innerHTML = '<p style="padding:12px;color:#a33">전체 스코어를 그리지 못했어요.</p>'; }
+}
+$('vOrig').onclick = () => showLeft('orig');
+$('vFull').onclick = () => showLeft('full');
+
+/* ---------- recognition ---------- */
+const NOTATION_RULES = `Notation for each note: PITCH:DURATION separated by spaces.
+- PITCH: letter, accidental, octave in scientific pitch (middle C = C4; treble-clef bottom line = E4; bass-clef top line = A3). Write the SOUNDING written pitch after applying the key signature and any accidental earlier in the same measure (in G major an unmarked F is F#). Accidentals: # b ## bb. Apply 8va/8vb lines. For a chord write only its highest note.
+- DURATION: w whole, h half, q quarter, e eighth, s 16th, t 32nd. Add "." for dotted ("..": double dotted). Add "3" for a note inside a triplet. Add "~" if the note is tied to the next note.
+- Rests: r:q, r:e., ... A whole-bar rest: r:M. Leave out grace notes.
+Before answering, check that each measure's durations add up to its time signature (only a pickup or the final measure may be shorter); if not, look again.`;
+function buildPrompt(i, n, st){
+  const staff = $('staff').value;
+  const staffText = staff === 'bottom' ? 'the BOTTOM staff of each system' : staff === 'only' ? 'the single staff (one line per system)' : 'the TOP staff of each system (the melody / solo part)';
+  const inst = $('instName').value.trim();
+  return `You are an expert music engraver doing optical music recognition on a photo or scan of printed sheet music.
+The attached image is page ${i+1} of ${n}. Transcribe exactly ONE melodic line: ${staffText}. If a system has only one staff, use it.${inst ? ` The part is for: ${inst}.` : ''}
+Ignore lyrics, chord symbols, fingerings, dynamics, articulations and other staves.
+${i === 0 ? 'This is the first page: number the first full measure 1. If the piece starts with an incomplete pickup (anacrusis) measure, set "pickup": true and give it n = 0.'
+ : `The previous page ended at measure ${st.lastN}, with clef ${st.clef}, key ${st.key} and time ${st.time}. Number this page's measures from ${st.lastN + 1}. Courtesy key/time signatures at a line start are not changes.`}
+
+Read every system from top to bottom and every measure from left to right. Never skip, merge or invent measures. A multi-measure rest of N bars becomes N measures of "r:M".
+${NOTATION_RULES}
+
+Reply with only this JSON:
+{"title": string or null, "composer": string or null, "clef": "G" | "F" | "C" (at the start of this page), "key": integer from -7 to 7 (sharps positive, flats negative, at the start of this page), "time": "4/4" (at the start of this page), "tempo": integer quarter-note BPM if a metronome mark is printed, else null, "pickup": boolean,
+ "measures": [{"n": 1, "notes": "G4:q B4:q D5:q B4:q"}, {"n": 2, "notes": "C5:e B4:e A4:e G4:e A4:h", "time": "3/4 only if it changes here", "key": "integer only if it changes here", "clef": "only if it changes here", "unsure": true}],
+ "remarks": "In Korean, one or two short sentences about anything you could not read clearly, or empty string"}
+Use "unsure": true only on measures you are not confident about. Omit "time", "key", "clef" from a measure unless they change at that measure.`;
+}
+let timerInt = null;
+$('runBtn').onclick = async () => {
+  const use = pages.filter(p => p.use); if (!use.length) return;
+  usedPages = use;
+  curRecId = null; markSaved(''); importedXML = null; importedDoc = null; $('partSel').hidden = true; $('vFull').hidden = true; $('expWhatBox').hidden = true; showLeft('orig');
+  runCtl = new AbortController(); updateRun(); $('stopBtn').hidden = false; $('runBtn').textContent = '인식 중…';
+  const st = { lastN: 0, clef: 'G', key: 0, time: '4/4' };
+  let meta = null; const measures = []; const remarks = [];
+  for (const p of pages) { p.status = p.use ? '대기' : ''; p.cls = ''; }
+  renderThumbs();
+  let failed = false;
+  for (let i = 0; i < use.length; i++) {
+    const p = use[i]; p.status = '읽는 중…'; p.cls = 'run'; renderThumbs();
+    const t0 = Date.now(); clearInterval(timerInt);
+    timerInt = setInterval(() => { $('timer').textContent = `${i+1}/${use.length}쪽 · ${Math.round((Date.now()-t0)/1000)}초`; }, 500);
+    try {
+      const r = await sample.json(buildPrompt(i, use.length, st), { images: [p.blob], modelTier: 'complex', signal: runCtl.signal });
+      if (!r || !Array.isArray(r.measures)) throw { code: 'invalid_json' };
+      if (i === 0) meta = { title: r.title || '', composer: r.composer || '', clef: normClef(r.clef), key: toInt(r.key, 0), time: normTime(r.time) || '4/4', tempo: toInt(r.tempo, null), pickup: !!r.pickup };
+      else if (!meta.title && r.title) meta.title = r.title;
+      for (const m of r.measures) {
+        if (!m || typeof m.notes !== 'string') continue;
+        measures.push({ notes: m.notes.trim(), time: normTime(m.time), key: m.key === undefined || m.key === null || m.key === '' ? null : toInt(m.key, null), clef: m.clef ? normClef(m.clef) : null, unsure: !!m.unsure, page: i+1 });
+        if (m.time && normTime(m.time)) st.time = normTime(m.time);
+        if (m.key !== undefined && m.key !== null && m.key !== '' && isFinite(+m.key)) st.key = +m.key;
+        if (m.clef) st.clef = normClef(m.clef);
+      }
+      if (i > 0 && measures.length) {   // a page may restate its starting signature
+        const firstOfPage = measures.find(m => m.page === i+1);
+        if (firstOfPage) { const k = toInt(r.key, st.key), t = normTime(r.time), c = r.clef ? normClef(r.clef) : null;
+          if (firstOfPage.key == null && k !== prevKeyBefore(measures, firstOfPage, meta)) firstOfPage.key = k;
+          if (!firstOfPage.time && t && t !== prevTimeBefore(measures, firstOfPage, meta)) firstOfPage.time = t;
+          if (!firstOfPage.clef && c && c !== prevClefBefore(measures, firstOfPage, meta)) firstOfPage.clef = c; }
+      }
+      st.lastN = (meta.pickup ? -1 : 0) + measures.length;
+      if (r.remarks) remarks.push(`${i+1}쪽: ${r.remarks}`);
+      p.status = `${r.measures.length}마디 · ${Math.round((Date.now()-t0)/1000)}초`; p.cls = 'ok';
+    } catch (e) {
+      p.status = e.code === 'cancelled' ? '멈춤' : '실패'; p.cls = 'err'; failed = true;
+      $('msg1').classList.add('err');
+      $('msg1').textContent = errText(e.code);
+      renderThumbs();
+      if (e.code !== 'invalid_json') break;   // one unreadable page: keep going; anything else: stop
+      continue;
+    }
+    renderThumbs();
+  }
+  clearInterval(timerInt); $('timer').textContent = '';
+  runCtl = null; $('stopBtn').hidden = true; $('runBtn').textContent = '음표 인식 다시'; updateRun();
+  if (meta && measures.length) {
+    if (!failed) { $('msg1').classList.remove('err'); $('msg1').textContent = `인식 완료: ${measures.length}마디. 아래에서 원본과 비교해 주세요.`; }
+    current = { meta, measures, remarks };
+    $('nota').value = toText(current);
+    renderOrig(); saveOrigPages();
+    await showScore(true);
+    try { localStorage.setItem('omr-last-text', $('nota').value); } catch(e) {}
+  }
+};
+$('stopBtn').onclick = () => runCtl && runCtl.abort();
+function errText(code){
+  return ({ not_granted: 'Claude 사용을 허용해야 인식할 수 있어요. 다시 누르면 허용 창이 나옵니다.',
+    rate_limited: '요청이 많아 잠시 막혔어요. 1~2분 뒤 다시 눌러 주세요.', usage_limit: 'Claude 사용 한도에 도달했어요. 나중에 다시 시도해 주세요.',
+    invalid_json: '이 쪽의 결과를 읽지 못했어요. 사진을 더 밝고 반듯하게 찍어 다시 올려 보세요.', image_rejected: '이미지가 너무 크거나 형식이 맞지 않아요.',
+    cancelled: '인식을 멈췄어요. 끝난 쪽까지의 결과는 아래에 있어요.' })[code] || '인식 중 문제가 생겼어요. 잠시 뒤 다시 눌러 주세요.';
+}
+const toInt = (v, d) => { const n = parseInt(v, 10); return isFinite(n) ? n : d; };
+function normTime(t){ if (!t || typeof t !== 'string') return null; const m = t.match(/(\d+)\s*\/\s*(\d+)/); if (m) return `${m[1]}/${m[2]}`; if (/^C\|?$/i.test(t.trim())) return t.includes('|') ? '2/2' : '4/4'; return null; }
+function normClef(c){ c = String(c || 'G').toUpperCase(); return c.startsWith('F') || c.includes('BASS') ? 'F' : c.startsWith('C') || c.includes('ALTO') || c.includes('TENOR') ? 'C' : 'G'; }
+function prevKeyBefore(ms, m, meta){ let k = meta.key; for (const x of ms) { if (x === m) break; if (x.key != null) k = x.key; } return k; }
+function prevTimeBefore(ms, m, meta){ let t = meta.time; for (const x of ms) { if (x === m) break; if (x.time) t = x.time; } return t; }
+function prevClefBefore(ms, m, meta){ let c = meta.clef; for (const x of ms) { if (x === m) break; if (x.clef) c = x.clef; } return c; }
+
+/* ---------- text format (editable) ---------- */
+function toText(sc){
+  const m = sc.meta; const lines = [
+    `제목: ${m.title || ''}`, `작곡: ${m.composer || ''}`, `음자리표: ${m.clef}`, `조표: ${m.key}`, `박자: ${m.time}`, `템포: ${m.tempo ?? ''}`, `못갖춘마디: ${m.pickup ? '예' : '아니오'}`, '---' ];
+  sc.measures.forEach((x, i) => {
+    const n = m.pickup ? i : i + 1; const pre = [x.time ? `{time=${x.time}}` : '', x.key != null ? `{key=${x.key}}` : '', x.clef ? `{clef=${x.clef}}` : ''].filter(Boolean).join(' ');
+    lines.push(`${String(n).padStart(3)} | ${pre ? pre + ' ' : ''}${x.notes}${x.unsure ? '   // 확인 필요' : ''}`);
+  });
+  return lines.join('\n');
+}
+function fromText(txt){
+  const meta = { title:'', composer:'', clef:'G', key:0, time:'4/4', tempo:null, pickup:false }; const measures = [];
+  let body = false;
+  for (let line of txt.split('\n')) {
+    const raw = line; let unsure = false;
+    const ci = line.indexOf('//'); if (ci >= 0) { unsure = /확인/.test(line.slice(ci)); line = line.slice(0, ci); }
+    if (!body) {
+      if (/^\s*---/.test(line)) { body = true; continue; }
+      const h = line.match(/^\s*([^:|]+?)\s*:\s*(.*)$/); if (!h) { if (/^\s*\d+\s*\|/.test(line)) body = true; else continue; }
+      else {
+        const [k, v] = [h[1].trim(), h[2].trim()];
+        if (k === '제목') meta.title = v; else if (k === '작곡') meta.composer = v; else if (k === '음자리표') meta.clef = normClef(v);
+        else if (k === '조표') meta.key = toInt(v, 0); else if (k === '박자') meta.time = normTime(v) || '4/4'; else if (k === '템포') meta.tempo = toInt(v, null);
+        else if (k === '못갖춘마디') meta.pickup = /예|yes|true/i.test(v);
+        continue;
+      }
+    }
+    const mm = line.match(/^\s*(-?\d+)?\s*\|\s*(.*)$/) || (line.trim() ? [null, null, line] : null);
+    if (!mm) continue;
+    let rest = mm[2]; const x = { notes:'', time:null, key:null, clef:null, unsure };
+    rest = rest.replace(/\{\s*(time|key|clef)\s*=\s*([^}]+)\}/g, (_, k, v) => { if (k==='time') x.time = normTime(v); else if (k==='key') x.key = toInt(v, null); else x.clef = normClef(v); return ''; });
+    x.notes = rest.trim().replace(/\s+/g, ' ');
+    if (x.notes || x.time || x.key != null) measures.push(x);
+  }
+  return { meta, measures };
+}
+
+/* ---------- token parsing, validation and MusicXML ---------- */
+const DIV = 48;
+const BASE = { w:[192,'whole'], h:[96,'half'], q:[48,'quarter'], e:[24,'eighth'], s:[12,'16th'], t:[6,'32nd'] };
+const STEP_ST = { C:0, D:2, E:4, F:5, G:7, A:9, B:11 };
+function parseToken(tok, measureLen){
+  const m = tok.match(/^(r|R|[A-Ga-g](?:##|bb|#|b|n|♯|♭)?-?\d(?:\+[A-Ga-g](?:##|bb|#|b|n)?-?\d)*)\s*:\s*([whqestM])([.3~]*)$/);
+  if (!m) return { error: true };
+  const flags = m[3]; const dots = (flags.match(/\./g) || []).length; const trip = flags.includes('3'); const tie = flags.includes('~');
+  let pitch = null;
+  if (!/^r$/i.test(m[1])) {
+    const cands = m[1].split('+').map(s => { const p = s.match(/^([A-Ga-g])(##|bb|#|b|n|♯|♭)?(-?\d)$/); const acc = (p[2]||'').replace('♯','#').replace('♭','b'); const alter = acc==='##'?2:acc==='bb'?-2:acc==='#'?1:acc==='b'?-1:0; const step = p[1].toUpperCase(); const oct = +p[3]; return { step, alter, oct, midi: (oct+1)*12 + STEP_ST[step] + alter }; });
+    pitch = cands.reduce((a, b) => b.midi > a.midi ? b : a);
+  }
+  if (m[2] === 'M') return { rest: true, whole: true, len: measureLen, type: 'whole', dots: 0, trip: false, tie: false };
+  let [len, type] = BASE[m[2]]; let add = len/2; for (let d = 0; d < dots; d++) { len += add; add /= 2; }
+  if (trip) len = len*2/3;
+  return { rest: !pitch, pitch, len, type, dots, trip, tie, baseLen: BASE[m[2]][0] };
+}
+function analyze(sc){
+  const out = []; const warns = [];
+  let time = sc.meta.time, key = sc.meta.key, clef = sc.meta.clef;
+  sc.measures.forEach((x, i) => {
+    if (x.time) time = x.time; if (x.key != null) key = x.key; if (x.clef) clef = x.clef;
+    const [tn, td] = time.split('/').map(Number); const mlen = Math.round(tn * 192 / td);
+    const num = sc.meta.pickup ? i : i + 1;
+    const toks = x.notes ? x.notes.trim().split(/\s+/).filter(Boolean) : [];
+    const notes = []; let sum = 0; const bad = [];
+    toks.forEach((t, ti) => { const p = parseToken(t, mlen); if (p.error) { bad.push(t); return; } p.ti = ti; notes.push(p); sum += p.len; });
+    if (!notes.length) notes.push({ rest:true, whole:true, len: mlen, type:'whole', dots:0, ti: -1 }), sum = mlen;
+    out.push({ num, notes, time, key, clef, mlen, sum, changes: { time: x.time, key: x.key, clef: x.clef }, unsure: x.unsure });
+    if (bad.length) warns.push([num, `읽을 수 없는 표기: ${bad.join(' ')}`, i]);
+    const isPick = sc.meta.pickup && i === 0, isLast = i === sc.measures.length - 1;
+    if (Math.abs(sum - mlen) > 0.5 && !((isPick || isLast) && sum < mlen)) warns.push([num, `박자 합이 맞지 않아요 (${fmtBeats(sum, td)} / ${tn}박)`, i]);
+    if (x.unsure) warns.push([num, 'Claude가 확신하지 못한 마디예요. 원본과 비교해 주세요.', i]);
+  });
+  return { measures: out, warns };
+}
+const fmtBeats = (len, td) => { const b = len / (192/td); return Number.isInteger(b) ? String(b) : b.toFixed(2); };
+function toXML(sc, A){
+  const m0 = sc.meta; const clefXML = (c) => c === 'F' ? '<clef><sign>F</sign><line>4</line></clef>' : c === 'C' ? '<clef><sign>C</sign><line>3</line></clef>' : '<clef><sign>G</sign><line>2</line></clef>';
+  let xml = ''; let tieOpen = false;
+  A.measures.forEach((M, i) => {
+    const attrs = [];
+    if (i === 0) attrs.push(`<divisions>${DIV}</divisions>`, `<key><fifths>${M.key}</fifths></key>`, `<time><beats>${M.time.split('/')[0]}</beats><beat-type>${M.time.split('/')[1]}</beat-type></time>`, clefXML(M.clef));
+    else { if (M.changes.key != null) attrs.push(`<key><fifths>${M.key}</fifths></key>`); if (M.changes.time) attrs.push(`<time><beats>${M.time.split('/')[0]}</beats><beat-type>${M.time.split('/')[1]}</beat-type></time>`); if (M.changes.clef) attrs.push(clefXML(M.clef)); }
+    const implicit = (m0.pickup && i === 0) ? ' implicit="yes"' : '';
+    xml += `<measure number="${M.num}"${implicit}>`;
+    if (attrs.length) xml += `<attributes>${attrs.join('')}</attributes>`;
+    if (i === 0 && m0.tempo) xml += `<direction placement="above"><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>${m0.tempo}</per-minute></metronome></direction-type><sound tempo="${m0.tempo}"/></direction>`;
+    let tAcc = 0, tMin = Infinity, inTup = false;
+    M.notes.forEach((n) => {
+      const dur = Math.round(n.len * DIV / 48);
+      xml += '<note>';
+      if (n.rest) xml += n.whole ? '<rest measure="yes"/>' : '<rest/>';
+      else xml += `<pitch><step>${n.pitch.step}</step>${n.pitch.alter ? `<alter>${n.pitch.alter}</alter>` : ''}<octave>${n.pitch.oct}</octave></pitch>`;
+      xml += `<duration>${Math.max(1, dur)}</duration>`;
+      const stop = tieOpen && !n.rest; const start = n.tie && !n.rest;
+      if (stop) xml += '<tie type="stop"/>'; if (start) xml += '<tie type="start"/>';
+      xml += `<voice>1</voice><type>${n.type}</type>${'<dot/>'.repeat(n.dots || 0)}`;
+      if (n.trip) xml += '<time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification>';
+      let nota = '';
+      if (stop) nota += '<tied type="stop"/>'; if (start) nota += '<tied type="start"/>';
+      if (n.trip) {
+        if (!inTup) { nota += '<tuplet type="start" bracket="yes"/>'; inTup = true; tAcc = 0; tMin = Infinity; }
+        tAcc += n.len*3/2; tMin = Math.min(tMin, n.baseLen);
+        if (tAcc >= 3*tMin - 0.01) { nota += '<tuplet type="stop"/>'; inTup = false; }
+      } else inTup = false;
+      if (nota) xml += `<notations>${nota}</notations>`;
+      xml += '</note>';
+      tieOpen = start;
+    });
+    if (i === A.measures.length - 1) xml += '<barline location="right"><bar-style>light-heavy</bar-style></barline>';
+    xml += '</measure>';
+  });
+  const title = esc(m0.title || $('fname').value || '인식한 악보');
+  const inst = esc($('instName').value.trim() || 'Melody');
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">\n<score-partwise version="3.1"><work><work-title>${title}</work-title></work><identification>${m0.composer ? `<creator type="composer">${esc(m0.composer)}</creator>` : ''}<encoding><software>악보 인식기</software></encoding></identification><part-list><score-part id="P1"><part-name>${inst}</part-name></score-part></part-list><part id="P1">${xml}</part></score-partwise>`;
+}
+
+/* ---------- render ---------- */
+let lastXML = '', lastA = null, cursorTimes = [], cursorIdx = 0;
+async function showScore(scroll){
+  const A = analyze(current); lastA = A; lastXML = toXML(current, A);
+  if (!$('orig').children.length) renderOrig();
+  if (scroll && A.measures.length) $('fromM').value = A.measures[0].num;
+  $('step2').hidden = false; $('step3').hidden = false;
+  if (current.meta.tempo) $('bpm').value = current.meta.tempo;
+  if (current.meta.title && !$('fname').dataset.touched) $('fname').value = current.meta.title;
+  if (!osmd) osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay($('osmd'), { autoResize:false, backend:'svg', drawTitle:true, drawPartNames:false, autoBeam:true, cursorsOptions:[{ type:0, color:'#2b59c3', alpha:0.35, follow:false }] });
+  const keepTop = $('scoreScroll').scrollTop;
+  try { await osmd.load(lastXML); osmd.render(); osmd.cursor.show(); buildCursor(); attachNoteEdit(); addMeasureHotspots($('osmd'), playFromMeasure, n => `세 번 누르면 ${n}마디부터 예시 듣기 · 재생 중 한 번 누르면 정지`, hotStop); if (!scroll) $('scoreScroll').scrollTop = keepTop; }
+  catch (e) { console.error(e); $('osmd').innerHTML = '<p style="padding:16px;color:#a33">악보를 그리지 못했어요. \'직접 고치기\'에서 표기를 확인해 주세요.</p>'; }
+  const total = A.measures.length, notes = A.measures.reduce((s, m) => s + m.notes.filter(n => !n.rest).length, 0);
+  const m = current.meta; const KEYN = ['C♭','G♭','D♭','A♭','E♭','B♭','F','C','G','D','A','E','B','F♯','C♯'];
+  $('sumNote').innerHTML = `<b>${esc(m.title || '제목 없음')}</b> · ${total}마디 · 음표 ${notes}개 · ${m.time} · 조표 ${KEYN[m.key+7] || m.key}장조 계열 · ${m.clef === 'F' ? '낮은음자리표' : m.clef === 'C' ? '가온음자리표' : '높은음자리표'}${m.pickup ? ' · 못갖춘마디로 시작' : ''}` +
+    (current.remarks && current.remarks.length ? `<br><span style="color:var(--ink-3)">${current.remarks.map(esc).join(' / ')}</span>` : '');
+  const canReread = !!(sample && imgLimits && usedPages.length);
+  const byM = new Map(); for (const [n, t, mi] of A.warns) { if (!byM.has(mi)) byM.set(mi, { n, items: [] }); byM.get(mi).items.push(t); }
+  $('warnCount').textContent = byM.size ? `${byM.size}마디` : '없음'; $('warnCount').classList.toggle('zero', !byM.size);
+  $('warns').innerHTML = byM.size ? [...byM.entries()].map(([mi, w]) => `<li data-goto="${mi}" title="눌러서 악보에서 이 마디 보기"><span class="issue"><b>${w.n}마디</b><br>${w.items.map(esc).join('<br>')}</span><span class="fix"><input class="inp fixin" data-mi="${mi}" value="${esc(current.measures[mi].notes)}" spellcheck="false" aria-label="${w.n}마디 음표"><button class="btn" data-apply="${mi}">적용</button></span><span class="fixerr" data-err="${mi}"></span><span class="acts"><button class="btn" data-play="${mi}">▶ 듣기</button>${canReread ? `<button class="btn" data-reread="${mi}">다시 인식</button>` : ''}${current.measures[mi].unsure ? `<button class="btn" data-ok="${mi}" title="원본과 같아요. 확인 필요 표시 지우기">맞음</button>` : ''}</span></li>`).join('')
+    : '<li class="ok">박자 합이 맞지 않거나 확신하지 못한 마디가 없어요. 그래도 음 높이는 원본과 비교해 확인해 주세요.</li>';
+  markActiveLog(); $('pickupChk').checked = !!current.meta.pickup;
+  if (!sel) { const firstW = A.warns.length ? A.warns[0][2] : 0; if (A.measures.length) fillFix(firstW); }
+  if (scroll) $('step2').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+function buildCursor(){ cursorTimes = []; const c = osmd.cursor; c.reset(); let g = 0; while (!c.Iterator.EndReached && g++ < 20000) { cursorTimes.push(c.Iterator.currentTimeStamp.RealValue*4); c.next(); } c.reset(); cursorIdx = 0; }
+function cursorTo(q){
+  let target = 0; while (target+1 < cursorTimes.length && cursorTimes[target+1] <= q + 1e-6) target++;
+  if (target < cursorIdx) { osmd.cursor.reset(); cursorIdx = 0; }
+  let moved = false; while (cursorIdx < target) { osmd.cursor.next(); cursorIdx++; moved = true; }
+  if (moved) { const el = osmd.cursor.cursorElement, box = $('scoreScroll'); if (el) { const r = el.getBoundingClientRect(), b = box.getBoundingClientRect(); if (r.top < b.top + b.height*0.1 || r.bottom > b.top + b.height*0.8) box.scrollTo({ top: Math.max(0, r.top - b.top + box.scrollTop - b.height*0.25), behavior:'smooth' }); } }
+}
+$('applyBtn').onclick = async () => {
+  const sc = fromText($('nota').value);
+  if (!sc.measures.length) { $('applyMsg').hidden = false; $('applyMsg').textContent = '마디가 없어요. "1 | G4:q ..." 형식인지 확인해 주세요.'; return; }
+  pushUndo(); const prev = current; sc.measures.forEach((m, i) => { m.page = prev && prev.measures[Math.min(i, prev.measures.length-1)] ? prev.measures[Math.min(i, prev.measures.length-1)].page : 1; });
+  current = { ...sc, remarks: current ? current.remarks : [] }; stopPlay(); sel = null; $('editBar').hidden = true;
+  await showScore(false);
+  $('applyMsg').hidden = false; $('applyMsg').textContent = `다시 그렸어요 (${sc.measures.length}마디).`;
+  try { localStorage.setItem('omr-last-text', $('nota').value); } catch(e) {}
+  scheduleAutoSave();
+};
+$('fname').addEventListener('input', () => { $('fname').dataset.touched = '1'; scheduleAutoSave(); });
+
+/* ---------- playback ---------- */
+let actx = null, play = null;
+function tone(t, dur, midi){
+  const f = 440*Math.pow(2,(midi-69)/12);
+  const o1 = actx.createOscillator(); o1.type = 'triangle'; o1.frequency.value = f;
+  const o2 = actx.createOscillator(); o2.type = 'sine'; o2.frequency.value = f*2; const g2 = actx.createGain(); g2.gain.value = 0.18;
+  const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = Math.min(9000, f*7);
+  const g = actx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.32, t+0.018); g.gain.exponentialRampToValueAtTime(0.2, t+Math.min(0.25, dur*0.6)); g.gain.setValueAtTime(0.2, t+Math.max(0.02, dur-0.06)); g.gain.exponentialRampToValueAtTime(0.0001, t+dur+0.02);
+  o1.connect(lp); o2.connect(g2).connect(lp); lp.connect(g).connect(actx.destination);
+  o1.start(t); o2.start(t); o1.stop(t+dur+0.05); o2.stop(t+dur+0.05); if (play) play.nodes.push(o1, o2);
+}
+function click(t, acc){
+  const o = actx.createOscillator(); o.frequency.value = acc ? 1800 : 1200; const g = actx.createGain();
+  g.gain.setValueAtTime(acc ? 0.22 : 0.13, t); g.gain.exponentialRampToValueAtTime(0.0001, t+0.03); o.connect(g).connect(actx.destination); o.start(t); o.stop(t+0.04); play.nodes.push(o);
+}
+function stopPlay(){ if (!play) return; clearInterval(play.timer); cancelAnimationFrame(play.raf); for (const n of play.nodes) { try { n.stop(); } catch(e){} } play = null; $('playBtn').textContent = '▶ 예시 듣기'; }
+$('playBtn').onclick = () => startPlay($('demoCI').value === '0');
+try { $('demoCI').value = localStorage.getItem('omr-demo-ci') || '0'; } catch(e) {}
+$('demoCI').addEventListener('change', () => { try { localStorage.setItem('omr-demo-ci', $('demoCI').value); } catch(e) {} });
+async function startPlay(noCountIn){
+  if (play) { stopPlay(); return; }
+  if (!lastA) return;
+  actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') await actx.resume();
+  const bpm = Math.max(20, Math.min(300, +$('bpm').value || 80)), spq = 60/bpm;
+  const events = [], clicks = [], mStart = []; let q = 0; let tieFrom = null;
+  const first = lastA.measures[0]; const [tn0, td0] = first.time.split('/').map(Number); const bar0 = tn0*4/td0;
+  const pick = current.meta.pickup ? bar0 - first.sum/48 : 0;
+  for (let k = 0; k < tn0; k++) clicks.push({ q: -pick - bar0 + k*4/td0, acc: k === 0 });
+  lastA.measures.forEach((M, i) => {
+    const [tn, td] = M.time.split('/').map(Number); const len = (i === 0 && current.meta.pickup) ? M.sum/48 : M.mlen/48;
+    const off = (i === 0 && current.meta.pickup) ? tn*4/td - len : 0;
+    mStart.push(q);
+    for (let x = 0; x < len - 1e-6; x += 4/td) clicks.push({ q: q + x, acc: Math.abs(((off + x)/(4/td)) % tn) < 1e-6 });
+    let qq = q;
+    for (const n of M.notes) {
+      const d = n.len/48;
+      if (!n.rest) { if (tieFrom && tieFrom.midi === n.pitch.midi) { tieFrom.dur += d; } else { const e = { q: qq, dur: d, midi: n.pitch.midi }; events.push(e); tieFrom = null; if (n.tie) tieFrom = e; } if (!n.tie) tieFrom = null; }
+      else tieFrom = null;
+      qq += d;
+    }
+    q += len;
+  });
+  // start from the chosen measure
+  const want = parseInt($('fromM').value, 10);
+  let si = isFinite(want) ? lastA.measures.findIndex(M => M.num >= want) : 0; if (si < 0) si = 0;
+  if (si === 0 && isFinite(want) && want > lastA.measures[0].num && lastA.measures.length) si = 0;
+  $('fromM').value = lastA.measures[si].num;
+  const qS = si > 0 ? mStart[si] : 0;
+  let t0 = actx.currentTime + 0.2 + (bar0 + pick)*spq;
+  let evs = events, cls = clicks;
+  if (si > 0) {
+    const SM = lastA.measures[si]; const [tn, td] = SM.time.split('/').map(Number); const bar = tn*4/td, beat = 4/td;
+    cls = []; for (let k = 0; k < tn; k++) cls.push({ q: qS - bar + k*beat, acc: k === 0 });
+    cls = cls.concat(clicks.filter(c => c.q >= qS - 1e-6));
+    evs = events.filter(e => e.q >= qS - 1e-6);
+    t0 = actx.currentTime + 0.2 + (bar - qS)*spq;
+  }
+  if (noCountIn) { cls = cls.filter(c => c.q >= qS - 1e-6); t0 = actx.currentTime + 0.12 - qS*spq; }
+  const endQ = q;
+  play = { nodes: [], timer: null, raf: 0 };
+  let ei = 0, ci = 0;
+  play.timer = setInterval(() => {
+    const h = actx.currentTime + 0.15;
+    while (ci < cls.length && t0 + cls[ci].q*spq < h) { click(Math.max(actx.currentTime, t0 + cls[ci].q*spq), cls[ci].acc); ci++; }
+    while (ei < evs.length && t0 + evs[ei].q*spq < h) { const e = evs[ei]; tone(Math.max(actx.currentTime, t0 + e.q*spq), Math.max(0.06, e.dur*spq*0.94 - 0.01), e.midi); ei++; }
+  }, 25);
+  osmd.cursor.reset(); cursorIdx = 0; cursorTo(qS);
+  const step = () => { if (!play) return; const qNow = (actx.currentTime - (actx.outputLatency||0) - t0)/spq; if (qNow >= qS) cursorTo(qNow); if (qNow > endQ + 0.5) { stopPlay(); return; } play.raf = requestAnimationFrame(step); };
+  play.raf = requestAnimationFrame(step);
+  $('playBtn').textContent = '■ 정지';
+};
+
+
+function hotStop(){ if (play) { stopPlay(); return true; } return false; }
+function playFromMeasure(num){ $('fromM').value = num; if (play) stopPlay(); startPlay(true); }
+
+/* ---------- note editing on the score ---------- */
+let sel = null;            // {mi, ti}
+const undoStack = [];
+function pushUndo(){ if (!current) return; undoStack.push(JSON.stringify(current)); if (undoStack.length > 60) undoStack.shift(); $('undoBtn').disabled = false; }
+$('undoBtn').onclick = undo;
+async function undo(){ if (!undoStack.length) return; current = JSON.parse(undoStack.pop()); $('undoBtn').disabled = !undoStack.length; $('nota').value = toText(current); sel = null; $('editBar').hidden = true; await showScore(false); saveDraft(); }
+function saveDraft(){ try { localStorage.setItem('omr-last-text', $('nota').value); } catch(e) {} scheduleAutoSave(); }
+
+const TOK_RE = /^(r|R|[A-Ga-g](?:##|bb|#|b|n|♯|♭)?-?\d(?:\+\S+)?)\s*:\s*([whqestM])([.3~]*)$/;
+function tokParse(t){
+  const m = String(t).match(TOK_RE); if (!m) return null;
+  const f = m[3]; let p = null;
+  if (!/^r$/i.test(m[1])) { const top = parseToken(t, 192).pitch; p = { step: top.step, alter: top.alter, oct: top.oct }; }
+  return { p, d: m[2], dots: (f.match(/\./g) || []).length, trip: f.includes('3'), tie: f.includes('~') };
+}
+function tokStr(o){
+  const acc = !o.p ? '' : o.p.alter === 2 ? '##' : o.p.alter === -2 ? 'bb' : o.p.alter === 1 ? '#' : o.p.alter === -1 ? 'b' : '';
+  if (o.d === 'M') return 'r:M';
+  return (o.p ? o.p.step + acc + o.p.oct : 'r') + ':' + o.d + '.'.repeat(o.dots) + (o.trip ? '3' : '') + (o.tie && o.p ? '~' : '');
+}
+const STEPS = 'CDEFGAB';
+function keyAlter(step, fifths){
+  if (fifths > 0) return 'FCGDAEB'.indexOf(step) < fifths ? 1 : 0;
+  if (fifths < 0) return 'BEADGCF'.indexOf(step) < -fifths ? -1 : 0;
+  return 0;
+}
+const midiOf = (p) => (p.oct + 1)*12 + STEP_ST[p.step] + p.alter;
+const pname = (p) => p.step + (p.alter === 1 ? '♯' : p.alter === -1 ? '♭' : p.alter === 2 ? '𝄪' : p.alter === -2 ? '𝄫' : '') + p.oct;
+const DUR_KO = { w:'온음표', h:'2분음표', q:'4분음표', e:'8분음표', s:'16분음표', t:'32분음표', M:'온마디 쉼표' };
+let lastPitch = { step:'B', alter:0, oct:4 };
+
+function attachNoteEdit(){
+  if (!lastA) return;
+  const map = new Map();
+  try {
+    osmd.Sheet.SourceMeasures.forEach((sm, mi) => {
+      const M = lastA.measures[mi]; if (!M) return; let k = 0;
+      for (const c of sm.VerticalSourceStaffEntryContainers) { const se = c.StaffEntries[0]; if (!se) continue;
+        for (const ve of se.VoiceEntries) for (const n of ve.Notes) { const an = M.notes[k]; if (an) map.set(n, { mi, ti: an.ti }); }
+        k++; }
+    });
+    for (const row of osmd.GraphicSheet.MeasureList) for (const gm of row) { if (!gm) continue;
+      for (const gse of gm.staffEntries) for (const gve of gse.graphicalVoiceEntries) for (const gn of gve.notes) {
+        const ref = map.get(gn.sourceNote); const el = gn.getSVGGElement ? gn.getSVGGElement() : null; if (!ref || !el) continue;
+        el.style.cursor = 'pointer';
+        el.onclick = (ev) => { ev.stopPropagation(); select(ref.mi, ref.ti, true); };
+        paint(el, '');
+        if (sel && sel.mi === ref.mi && sel.ti === ref.ti) paint(el, '#2b59c3');
+        else if (lastA.measures[ref.mi].unsure || lastA.warns.some(w => w[2] === ref.mi)) paint(el, '#b06a00');
+      }
+    }
+  } catch (e) { console.warn('note edit mapping failed', e); }
+}
+function paint(el, c){ el.querySelectorAll('path,rect,ellipse').forEach(p => { p.style.fill = c; p.style.stroke = c; }); }
+function tokensOf(mi){ return (current.measures[mi].notes || '').trim().split(/\s+/).filter(Boolean); }
+function select(mi, ti, sound){
+  sel = { mi, ti }; $('editBar').hidden = false;
+  const toks = tokensOf(mi); const o = ti >= 0 ? tokParse(toks[ti]) : null;
+  const num = lastA.measures[mi].num;
+  $('fromM').value = num;
+  fillFix(mi);
+  if (!o) { $('selInfo').textContent = `${num}마디 · 빈 마디 (뒤에 추가로 음표 넣기)`; }
+  else {
+    $('selInfo').textContent = `${num}마디 ${ti+1}번째 · ${o.p ? pname(o.p) : '쉼표'} ${DUR_KO[o.d] || ''}${o.dots ? ' (점)' : ''}${o.trip ? ' (셋잇단)' : ''}`;
+    $('durSel').value = o.d; $('dotChk').checked = o.dots > 0; $('tripChk').checked = o.trip; $('tieChk').checked = o.tie;
+    if (o.p) { lastPitch = { ...o.p }; if (sound) previewPitch(o.p); }
+  }
+  $('rereadMsg').hidden = true;
+  attachNoteEdit(); markActiveLog();
+}
+async function previewPitch(p){ try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') await actx.resume(); tone(actx.currentTime + 0.02, 0.45, midiOf(p)); } catch(e) {} }
+async function editSel(fn){
+  if (!sel || !current) return;
+  const toks = tokensOf(sel.mi); const o = sel.ti >= 0 ? tokParse(toks[sel.ti]) : null;
+  pushUndo();
+  const res = fn(o, toks);             // may mutate o / toks; may return new selection index
+  if (o && sel.ti >= 0 && toks[sel.ti] !== undefined && typeof res !== 'number' && res !== 'skip') toks[sel.ti] = tokStr(o);
+  current.measures[sel.mi].notes = toks.join(' ');
+  if (typeof res === 'number') sel.ti = res;
+  if (sel.ti >= toks.length) sel.ti = toks.length - 1;
+  $('nota').value = toText(current); saveDraft(); stopPlay();
+  await showScore(false);
+  if (sel.ti < 0 && toks.length) sel.ti = 0;
+  if (toks.length) select(sel.mi, sel.ti, true); else { select(sel.mi, -1, false); }
+}
+function curKey(mi){ return lastA.measures[mi].key; }
+const ACTIONS = {
+  up: (o) => { if (!o || !o.p) return; let i = STEPS.indexOf(o.p.step) + 1; if (i > 6) { i = 0; o.p.oct++; } o.p.step = STEPS[i]; o.p.alter = keyAlter(o.p.step, curKey(sel.mi)); },
+  down: (o) => { if (!o || !o.p) return; let i = STEPS.indexOf(o.p.step) - 1; if (i < 0) { i = 6; o.p.oct--; } o.p.step = STEPS[i]; o.p.alter = keyAlter(o.p.step, curKey(sel.mi)); },
+  sharp: (o) => { if (o && o.p) o.p.alter = 1; }, nat: (o) => { if (o && o.p) o.p.alter = 0; }, flat: (o) => { if (o && o.p) o.p.alter = -1; },
+  octup: (o) => { if (o && o.p) o.p.oct++; }, octdown: (o) => { if (o && o.p) o.p.oct--; },
+  rest: (o) => { if (!o) return; if (o.p) { lastPitch = { ...o.p }; o.p = null; o.tie = false; } else { o.p = { ...lastPitch }; if (o.d === 'M') o.d = 'w'; } },
+  dup: (o, toks) => { const t = o ? tokStr(o) : `${lastPitch.step}${lastPitch.alter===1?'#':lastPitch.alter===-1?'b':''}${lastPitch.oct}:q`; toks.splice(sel.ti + 1, 0, t); return sel.ti + 1; },
+  del: (o, toks) => { if (sel.ti < 0) return 'skip'; toks.splice(sel.ti, 1); return Math.max(0, sel.ti - 1); },
+};
+$('editBar').addEventListener('click', (ev) => {
+  const b = ev.target.closest('button[data-act]'); if (!b) return;
+  const act = b.dataset.act;
+  if (act === 'close') { sel = null; $('editBar').hidden = true; attachNoteEdit(); return; }
+  if (act === 'reread') { rereadMeasure(sel.mi); return; }
+  editSel(ACTIONS[act]);
+});
+$('durSel').onchange = () => editSel((o) => { if (!o) return; o.d = $('durSel').value; if (o.d === 'M') { o.p = null; o.dots = 0; o.trip = false; } });
+$('dotChk').onchange = () => editSel((o) => { if (o) o.dots = $('dotChk').checked ? 1 : 0; });
+$('tripChk').onchange = () => editSel((o) => { if (o) o.trip = $('tripChk').checked; });
+$('tieChk').onchange = () => editSel((o) => { if (o) o.tie = $('tieChk').checked; });
+document.addEventListener('keydown', (ev) => {
+  const tag = document.activeElement && document.activeElement.tagName;
+  if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z' && !/TEXTAREA|INPUT/.test(tag)) { ev.preventDefault(); undo(); return; }
+  if (!sel || /TEXTAREA|INPUT|SELECT/.test(tag)) return;
+  const k = ev.key;
+  if (k === 'ArrowUp') { ev.preventDefault(); editSel(ev.shiftKey ? ACTIONS.octup : ACTIONS.up); }
+  else if (k === 'ArrowDown') { ev.preventDefault(); editSel(ev.shiftKey ? ACTIONS.octdown : ACTIONS.down); }
+  else if (k === 'Delete' || k === 'Backspace') { ev.preventDefault(); editSel(ACTIONS.del); }
+  else if (k === 'ArrowRight' || k === 'ArrowLeft') { ev.preventDefault(); moveSel(k === 'ArrowRight' ? 1 : -1); }
+  else if (k === 'Escape') { sel = null; $('editBar').hidden = true; attachNoteEdit(); }
+});
+function moveSel(d){
+  let { mi, ti } = sel; ti += d;
+  while (mi >= 0 && mi < current.measures.length) {
+    const n = tokensOf(mi).length;
+    if (ti >= 0 && ti < n) { select(mi, ti, true); return; }
+    if (ti >= n) { mi++; ti = 0; } else { mi--; if (mi >= 0) ti = tokensOf(mi).length - 1; }
+  }
+}
+$('warns').addEventListener('click', (ev) => {
+  if (ev.target.closest('input')) return;
+  const ap = ev.target.closest('[data-apply]'); const ok = ev.target.closest('[data-ok]');
+  if (ap) { const mi = +ap.dataset.apply; applyMeasure(mi, document.querySelector(`.fixin[data-mi="${mi}"]`).value, document.querySelector(`[data-err="${mi}"]`)); return; }
+  if (ok) { const mi = +ok.dataset.ok; pushUndo(); current.measures[mi].unsure = false; $('nota').value = toText(current); saveDraft(); showScore(false); return; }
+  const pl = ev.target.closest('[data-play]'); const r = ev.target.closest('[data-reread]'); const g = (pl || r) ? null : ev.target.closest('[data-goto]');
+  if (pl) { const mi = +pl.dataset.play; playFromMeasure(lastA.measures[mi].num); return; }
+  if (g) { const mi = +g.dataset.goto; select(mi, tokensOf(mi).length ? 0 : -1, false); scrollToSel(); }
+  if (r) rereadMeasure(+r.dataset.reread);
+});
+function scrollToSel(){
+  try { const sm = osmd.GraphicSheet.MeasureList[sel.mi]; const gm = sm && sm[0]; const box = $('scoreScroll');
+    const el = gm && gm.staffEntries[0] && gm.staffEntries[0].graphicalVoiceEntries[0].notes[0].getSVGGElement();
+    if (el) { const r = el.getBoundingClientRect(), b = box.getBoundingClientRect(); box.scrollTo({ top: Math.max(0, r.top - b.top + box.scrollTop - b.height*0.3), behavior:'smooth' }); }
+    $('scoreScroll').scrollIntoView({ behavior:'smooth', block:'nearest' });
+  } catch(e) {}
+}
+
+function fillFix(mi){ if (!current || !current.measures[mi]) return; $('fixNum').value = lastA.measures[mi].num; $('fixText').value = current.measures[mi].notes; $('fixText').classList.remove('bad'); $('fixErr').textContent = ''; readFix(); }
+function miOfNum(num){ return lastA ? lastA.measures.findIndex(M => M.num === num) : -1; }
+async function applyMeasure(mi, text, errEl){
+  if (!current || !current.measures[mi]) return;
+  const x = { time:null, key:null, clef:null };
+  let rest = String(text || '').replace(/\/\/.*$/, '');
+  rest = rest.replace(/\{\s*(time|key|clef)\s*=\s*([^}]+)\}/g, (_, k, v) => { if (k==='time') x.time = normTime(v); else if (k==='key') x.key = toInt(v, null); else x.clef = normClef(v); return ''; });
+  const notes = rest.trim().replace(/\s+/g, ' ');
+  const bad = notes ? notes.split(' ').filter(t => parseToken(t, 192).error) : [];
+  const input = errEl === $('fixErr') ? $('fixText') : document.querySelector(`.fixin[data-mi="${mi}"]`);
+  if (bad.length) { if (errEl) errEl.textContent = `읽을 수 없는 표기: ${bad.join(' ')}`; if (input) input.classList.add('bad'); return; }
+  pushUndo();
+  const m = current.measures[mi]; m.notes = notes; m.unsure = false;
+  if (x.time) m.time = x.time; if (x.key != null) m.key = x.key; if (x.clef) m.clef = x.clef;
+  $('nota').value = toText(current); saveDraft(); stopPlay();
+  await showScore(false);
+  select(mi, tokensOf(mi).length ? 0 : -1, false);
+  const A = lastA.measures[mi]; const shortOk = ((mi === 0 && current.meta.pickup) || mi === lastA.measures.length - 1) && A.sum < A.mlen; const ok = shortOk || Math.abs(A.sum - A.mlen) < 0.5;
+  $('fixErr').textContent = ok ? '' : `적용했지만 박자 합이 아직 맞지 않아요 (${fmtBeats(A.sum, +A.time.split('/')[1])} / ${A.time.split('/')[0]}박)`;
+}
+$('pickupChk').onchange = async () => {
+  if (!current) return; pushUndo(); current.meta.pickup = $('pickupChk').checked;
+  $('nota').value = toText(current); saveDraft(); stopPlay(); sel = null; $('editBar').hidden = true;
+  await showScore(false); fillFix(0);
+};
+$('fixApply').onclick = () => { const mi = miOfNum(parseInt($('fixNum').value, 10)); if (mi < 0) { $('fixErr').textContent = '그런 마디가 없어요.'; return; } applyMeasure(mi, $('fixText').value, $('fixErr')); };
+$('fixText').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); $('fixApply').onclick(); } });
+$('fixText').addEventListener('input', () => { $('fixText').classList.remove('bad'); $('fixErr').textContent = ''; readFix(); });
+/* plain-Korean reading of what is typed, so the notation is easy to check */
+const SOL = { C:'도', D:'레', E:'미', F:'파', G:'솔', A:'라', B:'시' };
+const DUR_K = { w:'온', h:'2분', q:'4분', e:'8분', s:'16분', t:'32분', M:'온마디' };
+function readFix(){
+  const txt = $('fixText').value.replace(/\{[^}]*\}/g, '').replace(/\/\/.*$/, '').trim(); const out = $('fixRead');
+  if (!txt) { out.innerHTML = '<span class="sum">아래 도우미로 음표를 넣거나 직접 입력하세요.</span>'; return; }
+  let total = 0; const parts = txt.split(/\s+/).map(t => {
+    const o = tokParse(t); if (!o) return `<span class="bad">${esc(t)}?</span>`;
+    const p = parseToken(t, 192); total += p.len;
+    const d = (DUR_K[o.d] || '') + (o.dots ? ' 점' : '') + (o.trip ? ' 셋잇단' : '');
+    if (!o.p) return o.d === 'M' ? '온마디 쉼표' : `${d} 쉼표`;
+    const acc = o.p.alter === 1 ? '♯' : o.p.alter === -1 ? '♭' : o.p.alter === 2 ? '𝄪' : o.p.alter === -2 ? '𝄫' : '';
+    return `${SOL[o.p.step]}${acc}<sub>${o.p.oct}</sub> ${d}${o.tie ? ' ⁀' : ''}`;
+  });
+  const mi = miOfNum(parseInt($('fixNum').value, 10)); let need = '';
+  if (mi >= 0 && lastA) { const M = lastA.measures[mi]; const [tn, td] = M.time.split('/').map(Number); need = ` · 합 ${fmtBeats(total, td)} / ${tn}박`; }
+  out.innerHTML = parts.join(' · ') + `<span class="sum">${need}</span>`;
+}
+function curFixKey(){ const mi = miOfNum(parseInt($('fixNum').value, 10)); return mi >= 0 && lastA ? lastA.measures[mi].key : (current ? current.meta.key : 0); }
+$('bAdd').onclick = () => {
+  const st = $('bStep').value, d = $('bDur').value; let tok;
+  if (st === 'r' || d === 'M') tok = d === 'M' ? 'r:M' : `r:${d}${$('bDot').checked ? '.' : ''}${$('bTrip').checked ? '3' : ''}`;
+  else {
+    const al = $('bAcc').value === 'key' ? keyAlter(st, curFixKey()) : +$('bAcc').value;
+    tok = tokStr({ p: { step: st, alter: al, oct: +$('bOct').value }, d, dots: $('bDot').checked ? 1 : 0, trip: $('bTrip').checked, tie: $('bTie').checked });
+    previewPitch({ step: st, alter: al, oct: +$('bOct').value });
+  }
+  $('fixText').value = ($('fixText').value.trim() + ' ' + tok).trim(); $('fixText').dispatchEvent(new Event('input'));
+};
+$('bBack').onclick = () => { const t = $('fixText').value.trim().split(/\s+/); t.pop(); $('fixText').value = t.join(' '); $('fixText').dispatchEvent(new Event('input')); };
+$('bClear').onclick = () => { $('fixText').value = ''; $('fixText').dispatchEvent(new Event('input')); $('fixText').focus(); };
+$('fixNum').addEventListener('change', () => { const mi = miOfNum(parseInt($('fixNum').value, 10)); if (mi >= 0) select(mi, tokensOf(mi).length ? 0 : -1, false); else { $('fixText').value = ''; $('fixErr').textContent = '그런 마디가 없어요.'; } });
+$('warns').addEventListener('keydown', (ev) => { const inp = ev.target.closest('.fixin'); if (inp && ev.key === 'Enter') { ev.preventDefault(); const mi = +inp.dataset.mi; applyMeasure(mi, inp.value, document.querySelector(`[data-err="${mi}"]`)); } });
+$('warns').addEventListener('input', (ev) => { const inp = ev.target.closest('.fixin'); if (inp) inp.classList.remove('bad'); });
+function markActiveLog(){ document.querySelectorAll('#warns li[data-goto]').forEach(li => li.classList.toggle('active', !!sel && +li.dataset.goto === sel.mi)); }
+$('openText').onclick = () => { $('editBox').open = true; $('editBox').scrollIntoView({ behavior:'smooth', block:'start' }); };
+
+/* ---------- re-read one measure with Claude ---------- */
+let rereadBusy = false;
+async function rereadMeasure(mi){
+  const msg = $('rereadMsg'); msg.hidden = false; msg.classList.remove('err');
+  if (!sample || !imgLimits) { msg.textContent = '이 화면에서는 Claude 인식을 쓸 수 없어요. 직접 고쳐 주세요.'; msg.classList.add('err'); return; }
+  if (!usedPages.length) { msg.textContent = '원본 이미지가 없어요. 악보를 다시 올리고 인식한 뒤에 쓸 수 있어요.'; msg.classList.add('err'); return; }
+  if (rereadBusy) return;
+  const M = lastA.measures[mi], x = current.measures[mi];
+  const pageNo = Math.min(Math.max(1, x.page || 1), usedPages.length);
+  const firstOnPage = current.measures.findIndex(m => (m.page || 1) === pageNo);
+  const nthOnPage = mi - (firstOnPage < 0 ? 0 : firstOnPage) + 1;
+  const prev = current.measures[mi-1], next = current.measures[mi+1];
+  const prompt = `You are an expert music engraver checking one measure of an optical-music-recognition result. The attached image is page ${pageNo} of the score.
+Re-read ONLY measure number ${M.num}. Counting measures on this page (systems top to bottom, measures left to right) it is measure #${nthOnPage} on the page, and the first measure on this page is measure ${current.meta.pickup ? firstOnPage : firstOnPage + 1}. Use printed measure numbers at the start of systems to locate it, and use the neighbours to confirm you have the right one.
+Read ${$('staff').value === 'bottom' ? 'the BOTTOM staff of each system' : $('staff').value === 'only' ? 'the single staff' : 'the TOP staff of each system'}.
+At this measure: clef ${M.clef}, key signature ${M.key} (sharps positive, flats negative), time ${M.time}.
+Previous measure (${M.num - 1}) was transcribed as: ${prev ? prev.notes : '(none)'}
+Next measure (${M.num + 1}) was transcribed as: ${next ? next.notes : '(none)'}
+The current transcription of measure ${M.num}, which may be wrong: ${x.notes || '(empty)'}
+
+${NOTATION_RULES}
+
+Reply with only this JSON: {"notes": "the corrected notes of measure ${M.num}", "unsure": true or false, "remarks": "In Korean, one short sentence about what you changed or what is hard to read"}`;
+  rereadBusy = true; const t0 = Date.now();
+  const tick = setInterval(() => { msg.textContent = `${M.num}마디를 다시 읽는 중… ${Math.round((Date.now()-t0)/1000)}초`; }, 500);
+  msg.textContent = `${M.num}마디를 다시 읽는 중…`;
+  try {
+    const r = await sample.json(prompt, { images: [usedPages[pageNo-1].blob], modelTier: 'complex', cache: false });
+    clearInterval(tick);
+    if (!r || typeof r.notes !== 'string' || !r.notes.trim()) throw { code: 'invalid_json' };
+    const before = x.notes; const after = r.notes.trim().replace(/\s+/g, ' ');
+    pushUndo();
+    x.notes = after; x.unsure = !!r.unsure;
+    $('nota').value = toText(current); saveDraft(); stopPlay();
+    await showScore(false);
+    const changed = before.trim() !== after;
+    msg.innerHTML = `<b>${M.num}마디</b> ${changed ? `다시 읽었어요: <code>${esc(before)}</code> → <code>${esc(after)}</code>` : '다시 읽었는데 결과가 같아요. 원본과 다르면 음표를 눌러 직접 고쳐 주세요.'}${r.remarks ? `<br><span style="color:var(--ink-3)">${esc(r.remarks)}</span>` : ''}${changed ? ' <button class="btn sm" id="rrUndo">되돌리기</button>' : ''}`;
+    const u = $('rrUndo'); if (u) u.onclick = () => { undo(); msg.hidden = true; };
+    select(mi, tokensOf(mi).length ? 0 : -1, false);
+  } catch (e) { clearInterval(tick); msg.classList.add('err'); msg.textContent = errText(e && e.code); }
+  finally { rereadBusy = false; }
+}
+
+
+/* ---------- click a measure to hear the example from there ---------- */
+const hotTap = { num: null, n: 0, t: 0 };
+function addMeasureHotspots(container, onPick, label, onStop){
+  const svg = container.querySelector('svg'); if (!svg) return;
+  svg.querySelectorAll('rect.mhot').forEach(r => r.remove());
+  const NS = 'http://www.w3.org/2000/svg';
+  const groups = [...svg.querySelectorAll('g.vf-measure')];
+  for (const g of groups) {
+    let bb; try { bb = g.getBBox(); } catch(e) { continue; }
+    if (!bb || !bb.width) continue;
+    const num = parseInt(g.id, 10); if (!isFinite(num)) continue;
+    const r = document.createElementNS(NS, 'rect');
+    r.setAttribute('x', bb.x); r.setAttribute('y', bb.y - 22); r.setAttribute('width', bb.width); r.setAttribute('height', bb.height + 44);
+    r.setAttribute('class', 'mhot'); r.setAttribute('rx', 4);
+    const t = document.createElementNS(NS, 'title'); t.textContent = label(num); r.appendChild(t);
+    svg.insertBefore(r, svg.firstChild);
+    const on = () => r.classList.add('hov'), off = () => r.classList.remove('hov');
+    const pick = (ev) => {
+      if (ev.target.closest && ev.target.closest('.vf-stavenote')) return; ev.stopPropagation();
+      const now = Date.now();
+      if (hotTap.num === num && now - hotTap.t < 600) hotTap.n++; else hotTap.n = 1;   // three quick taps on the same measure
+      hotTap.num = num; hotTap.t = now;
+      r.classList.add('tap' + Math.min(hotTap.n, 2)); setTimeout(() => r.classList.remove('tap1', 'tap2'), 600);
+      if (hotTap.n === 1 && onStop && onStop()) return;   // one tap while playing stops it (two more taps jump here)
+      if (hotTap.n >= 3) { hotTap.n = 0; onPick(num); }
+    };
+    for (const el of [r, g]) { el.addEventListener('mouseenter', on); el.addEventListener('mouseleave', off); el.addEventListener('click', pick); el.style.cursor = 'pointer'; }
+  }
+}
+
+
+/* ---------- my score library ---------- */
+let curRecId = null, autoT = null, saving = false, libRecs = [];
+const now = () => new Date().toISOString();
+function cloudStore(uid){
+  const col = dbCap.collection(`data/users/${uid}`);   // private to this viewer; one doc per saved score
+  return {
+    kind: 'cloud',
+    async list(){ const q = await col.orderBy('updatedAt', 'desc').limit(200).get(); return q.docs.map(d => ({ id: d.id, ...d.data() })); },
+    async save(rec){
+      const pages = [];
+      for (const p of rec.pagesLive) {
+        if (!p.assetId && assetsCap && p.blob) { try { const r = await assetsCap.upload(p.blob); p.assetId = r.id; p.assetUrl = r.url; } catch(e) {} }
+        if (p.assetId) pages.push({ id: p.assetId, url: p.assetUrl, name: p.name, base: p.base || '' });
+      }
+      let full = rec.fullOld || null;
+      if (rec.scoreXml && (!full || full.len !== rec.scoreXml.length) && assetsCap) { try { const r = await assetsCap.upload(new Blob([rec.scoreXml], { type: 'text/plain' })); full = { id: r.id, url: r.url, len: rec.scoreXml.length }; } catch(e) {} }
+      const data = { title: rec.title, text: rec.text, pageOf: rec.pageOf, pages, measures: rec.measures, part: rec.part, full, updatedAt: now(), createdAt: rec.createdAt || now() };
+      if (rec.id) { await col.doc(rec.id).set(data); return rec.id; }
+      const ref = await col.add(data); return ref.id;
+    },
+    async fullXml(rec){ if (!rec.full || !rec.full.url) return null; try { const r = await fetch(rec.full.url); return r.ok ? await r.text() : null; } catch(e) { return null; } },
+    async open(rec){
+      const out = [];
+      for (const p of rec.pages || []) {
+        let blob = null; try { const r = await fetch(p.url); if (r.ok) blob = await r.blob(); } catch(e) {}
+        out.push({ name: p.name, blob, url: blob ? URL.createObjectURL(blob) : p.url, use: true, base: p.base, assetId: p.id, assetUrl: p.url });
+      }
+      return out;
+    },
+    async remove(rec){ await col.doc(rec.id).delete(); if (assetsCap) for (const p of rec.pages || []) { try { await assetsCap.delete(p.id); } catch(e) {} } },
+    thumb(rec){ return rec.pages && rec.pages[0] ? rec.pages[0].url : null; }
+  };
+}
+function localStore(){
+  const tx = async (mode) => (await idb()).transaction('lib', mode).objectStore('lib');
+  const req = (r) => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+  return {
+    kind: 'local',
+    async list(){ try { const all = await req((await tx('readonly')).getAll()); return all.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)); } catch(e) { return []; } },
+    async save(rec){
+      const id = rec.id || ('s' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
+      const data = { id, title: rec.title, text: rec.text, pageOf: rec.pageOf, pages: rec.pagesLive.filter(p => p.blob).map(p => ({ name: p.name, blob: p.blob, base: p.base || '' })), measures: rec.measures, part: rec.part, scoreXml: rec.scoreXml || null, updatedAt: now(), createdAt: rec.createdAt || now() };
+      await req((await tx('readwrite')).put(data)); return id;
+    },
+    async open(rec){ return (rec.pages || []).map(p => mkPage(p.name, p.blob, p.base)); },
+    async fullXml(rec){ return rec.scoreXml || null; },
+    async remove(rec){ await req((await tx('readwrite')).delete(rec.id)); },
+    thumb(rec){ const p = rec.pages && rec.pages[0]; if (!p || !p.blob) return null; if (!p._u) p._u = URL.createObjectURL(p.blob); return p._u; }
+  };
+}
+function markSaved(state, text){ const el = $('saveState'); el.className = 'savestate ' + (state || ''); el.textContent = text || ''; }
+async function saveToLibrary(manual){
+  if (!current || !store || saving) return;
+  saving = true; markSaved('', '저장 중…'); $('libSave').disabled = true;
+  try {
+    const recOld = libRecs.find(r => r.id === curRecId);
+    const rec = { id: curRecId, title: baseName(), text: toText(current), pageOf: current.measures.map(m => m.page || 1), measures: current.measures.length, pagesLive: usedPages, createdAt: recOld && recOld.createdAt, scoreXml: importedXML, part: importedXML ? +$('partSel').value : null, fullOld: recOld && recOld.full };
+    curRecId = await store.save(rec);
+    const t = new Date(); markSaved('ok', `저장됨 ${t.getHours()}:${String(t.getMinutes()).padStart(2, '0')}${manual ? '' : ' (자동)'}`);
+    $('libSave').textContent = '저장됨 · 다시 저장';
+    await renderLibrary();
+  } catch(e) {
+    console.error(e);
+    if (store.kind === 'cloud') { store = localStore(); curRecId = null; saving = false; markSaved('', '계정 저장이 안 돼서 이 브라우저에 저장해요…'); return saveToLibrary(manual); }
+    markSaved('err', '저장하지 못했어요. 다시 눌러 주세요.');
+  }
+  finally { saving = false; $('libSave').disabled = false; }
+}
+function scheduleAutoSave(){ if (!curRecId) return; markSaved('', '고친 내용 저장 대기…'); clearTimeout(autoT); autoT = setTimeout(() => saveToLibrary(false), 2500); }
+$('libSave').onclick = () => saveToLibrary(true);
+async function renderLibrary(){
+  if (!store) return;
+  libRecs = await store.list();
+  $('libSub').textContent = (store.kind === 'cloud' ? '내 Claude 계정에 저장돼요. 다른 기기에서 이 페이지를 열어도 보여요. ' : '이 브라우저에만 저장돼요. ') + '한 번 저장한 악보는 고칠 때마다 자동 저장돼요.';
+  $('libList').innerHTML = libRecs.length ? libRecs.map(r => {
+    const th = store.thumb(r); const d = new Date(r.updatedAt);
+    return `<div class="lib-item ${r.id === curRecId ? 'cur' : ''}" data-id="${esc(r.id)}">${th ? `<img src="${esc(th)}" alt="">` : '<div class="noimg"></div>'}
+      <div class="meta"><span class="t" title="${esc(r.title)}">${esc(r.title)}</span><span class="d">${r.measures || 0}마디 · 원본 ${(r.pages || []).length}쪽 · ${d.toLocaleDateString('ko-KR', { month:'numeric', day:'numeric' })} ${d.toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit' })}</span>
+      <span class="acts"><button class="btn" data-open="${esc(r.id)}">열기</button><button class="btn danger" data-del="${esc(r.id)}">삭제</button></span></div></div>`;
+  }).join('') : '<div class="note">아직 저장한 악보가 없어요. 악보를 인식한 뒤 [악보함에 저장]을 누르세요.</div>';
+  $('newBtn').hidden = !curRecId;
+}
+$('libList').addEventListener('click', async (ev) => {
+  const o = ev.target.closest('[data-open]'), d = ev.target.closest('[data-del]');
+  if (o) {
+    const rec = libRecs.find(r => r.id === o.dataset.open); if (!rec) return;
+    o.disabled = true; o.textContent = '여는 중…';
+    try {
+      stopPlay(); sel = null; $('editBar').hidden = true; undoStack.length = 0; $('undoBtn').disabled = true;
+      usedPages = await store.open(rec); renderOrig();
+      const fx = store.fullXml ? await store.fullXml(rec) : null;
+      if (fx) { importedXML = fx; importedDoc = new DOMParser().parseFromString(fx, 'application/xml'); fullDirty = true;
+        importedParts = [...importedDoc.querySelectorAll('part-list > score-part')].map(sp => (sp.querySelector('part-name')?.textContent || sp.id).trim());
+        $('partSel').innerHTML = importedParts.map((n, i) => `<option value="${i}">${i + 1}. ${esc(n)}</option>`).join(''); $('partSel').hidden = importedParts.length < 2; $('partSel').value = rec.part || 0;
+        $('vFull').hidden = false; $('expWhatBox').hidden = false; }
+      else { importedXML = null; importedDoc = null; $('partSel').hidden = true; $('vFull').hidden = true; $('expWhatBox').hidden = true; showLeft('orig'); }
+      const sc = fromText(rec.text); sc.measures.forEach((m, i) => m.page = (rec.pageOf && rec.pageOf[i]) || 1);
+      current = { ...sc, remarks: [] }; $('nota').value = rec.text; $('fname').value = rec.title; $('fname').dataset.touched = '1';
+      curRecId = rec.id; await showScore(true); markSaved('ok', '악보함에서 열었어요'); $('libSave').textContent = '저장됨 · 다시 저장';
+      try { localStorage.setItem('omr-last-text', rec.text); } catch(e) {}
+      renderLibrary();
+    } catch(e) { console.error(e); o.textContent = '열지 못함'; }
+  }
+  if (d) {
+    if (d.dataset.armed !== '1') { d.dataset.armed = '1'; d.textContent = '한 번 더 누르면 삭제'; setTimeout(() => { d.dataset.armed = ''; d.textContent = '삭제'; }, 3000); return; }
+    const rec = libRecs.find(r => r.id === d.dataset.del); if (!rec) return;
+    try { await store.remove(rec); if (curRecId === rec.id) { curRecId = null; markSaved('', ''); $('libSave').textContent = '악보함에 저장'; } } catch(e) { console.error(e); }
+    renderLibrary();
+  }
+});
+$('newBtn').onclick = () => { curRecId = null; markSaved('', ''); $('libSave').textContent = '악보함에 저장'; $('step1').scrollIntoView({ behavior:'smooth' }); renderLibrary(); };
+
+/* ---------- save ---------- */
+const baseName = () => ($('fname').value || current?.meta.title || '인식한 악보').replace(/[\\/:*?"<>|]+/g, ' ').trim() || '인식한 악보';
+const fileName = () => baseName() + '.musicxml';
+/* clean, black-and-white A4 pages for printing / sharing */
+async function renderPrintPages(xmlOverride){
+  const host = document.createElement('div');
+  host.style.cssText = 'position:fixed;left:-12000px;top:0;width:1000px;background:#fff;color:#000';
+  document.body.appendChild(host);
+  try {
+    const o = new opensheetmusicdisplay.OpenSheetMusicDisplay(host, { autoResize:false, backend:'svg', pageFormat:'A4_P', pageBackgroundColor:'#FFFFFF', drawTitle:true, drawComposer:true, drawPartNames: !!xmlOverride, drawPartAbbreviations: !!xmlOverride, autoBeam:true });
+    await o.load(xmlOverride || lastXML); o.render();
+    const out = [];
+    for (const svg of host.querySelectorAll('svg')) {
+      const w = parseFloat(svg.getAttribute('width')) || svg.getBoundingClientRect().width, h = parseFloat(svg.getAttribute('height')) || svg.getBoundingClientRect().height;
+      if (!svg.getAttribute('xmlns')) svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      svg.setAttribute('width', w); svg.setAttribute('height', h);
+      const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml' }));
+      const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+      const sc = 2400 / w; const cv = document.createElement('canvas'); cv.width = Math.round(w*sc); cv.height = Math.round(h*sc);
+      const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height); g.drawImage(img, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(url); out.push(cv);
+    }
+    return out;
+  } finally { host.remove(); }
+}
+async function saveBlob(blob, name, kind){
+  const msg = $('saveMsg'); msg.hidden = false; msg.classList.remove('err');
+  if (!downloads) { msg.classList.add('err'); msg.textContent = '이 화면에서는 파일로 저장할 수 없어요. claude.ai에서 페이지를 열어 주세요.'; return; }
+  try { const r = await downloads.save({ filename: name, data: blob }); msg.textContent = r && r.status === 'delivered' ? '선택한 곳으로 보냈어요.' : `${name} 을(를) 저장했어요.${kind === 'xml' ? ' 연습 코치에서 [악보 열기]로 이 파일을 여세요.' : ''}`; }
+  catch (e) { msg.classList.add('err'); msg.textContent = e && e.code === 'declined' ? '저장을 취소했어요.' : '저장하지 못했어요. 잠시 뒤 다시 눌러 주세요.'; }
+}
+async function exportAs(kind){
+  if (!lastXML) return;
+  const btn = $(kind === 'pdf' ? 'pdfBtn' : 'pngBtn'); const label = btn.textContent; btn.disabled = true; btn.textContent = '만드는 중…';
+  try {
+    const fullWanted = importedXML && $('expWhat').value === 'full';
+    const pages = await renderPrintPages(fullWanted ? importedXML : null); if (!pages.length) throw new Error('no pages');
+    if (kind === 'png') {
+      const gap = 24, W = Math.max(...pages.map(c => c.width)), H = pages.reduce((s, c) => s + c.height, 0) + gap*(pages.length-1);
+      const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d'); g.fillStyle = '#e9e9e9'; g.fillRect(0, 0, W, H);
+      let y = 0; for (const c of pages) { g.drawImage(c, 0, y); y += c.height + gap; }
+      const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
+      await saveBlob(blob, baseName() + '.png', 'png');
+    } else {
+      const { jsPDF } = window.jspdf; const doc = new jsPDF({ unit:'pt', format:'a4', orientation:'portrait' });
+      const PW = doc.internal.pageSize.getWidth(), PH = doc.internal.pageSize.getHeight();
+      pages.forEach((c, i) => { if (i) doc.addPage(); const r = Math.min(PW / c.width, PH / c.height); const w = c.width*r, h = c.height*r; doc.addImage(c.toDataURL('image/png'), 'PNG', (PW-w)/2, 0, w, h, undefined, 'FAST'); });
+      doc.setProperties({ title: baseName() });
+      await saveBlob(doc.output('blob'), baseName() + '.pdf', 'pdf');
+    }
+  } catch (e) { console.error(e); const msg = $('saveMsg'); msg.hidden = false; msg.classList.add('err'); msg.textContent = '파일을 만들지 못했어요. 악보가 제대로 그려졌는지 확인해 주세요.'; }
+  finally { btn.disabled = false; btn.textContent = label; }
+}
+$('pngBtn').onclick = () => exportAs('png');
+$('pdfBtn').onclick = () => exportAs('pdf');
+$('saveBtn').onclick = async () => {
+  if (!lastXML) return;
+  const msg = $('saveMsg'); msg.hidden = false; msg.classList.remove('err');
+  try { const r = await downloads.save({ filename: fileName(), data: new Blob([lastXML], { type: 'application/vnd.recordare.musicxml+xml' }) });
+    msg.textContent = r && r.status === 'delivered' ? '선택한 곳으로 보냈어요.' : `${fileName()} 을(를) 저장했어요. 연습 코치에서 [악보 열기]로 이 파일을 여세요.`;
+  } catch (e) { msg.classList.add('err'); msg.textContent = e && e.code === 'declined' ? '저장을 취소했어요.' : '여기서는 저장할 수 없어요. [MusicXML 복사]를 눌러 메모장에 붙여 넣고 .musicxml로 저장해 주세요.'; }
+};
+$('copyBtn').onclick = async () => {
+  if (!lastXML) return; const msg = $('saveMsg'); msg.hidden = false; msg.classList.remove('err');
+  try { await navigator.clipboard.writeText(lastXML); msg.textContent = '복사했어요. 메모장에 붙여 넣고 이름을 "곡이름.musicxml"로 저장하면 연습 코치에서 열 수 있어요.'; }
+  catch (e) { const t = $('nota'); msg.textContent = '복사가 막혀 있어요. 저장 버튼을 써 주세요.'; msg.classList.add('err'); }
+};
+
+/* restore last edit (this browser only) */
+try { const last = localStorage.getItem('omr-last-text'); if (last) { const row = document.createElement('div'); row.className = 'row'; row.innerHTML = '<span class="note" style="flex:1">지난번 인식 결과가 이 브라우저에 남아 있어요.</span><button class="btn sm" id="restoreBtn">불러오기</button>'; $('step1').appendChild(row);
+  $('restoreBtn').onclick = async () => { $('nota').value = last; current = { ...fromText(last), remarks: [] }; const saved = await loadOrigPages(); if (saved.length) usedPages = saved; renderOrig(); await showScore(true); row.remove(); }; } } catch(e) {}
+
+window.__omr = { select, editSel, ACTIONS, get sel(){return sel;}, tokParse, tokStr, fromText, toText, analyze, toXML, set current(v){ current = v; }, get current(){ return current; }, showScore };
+})();
+</script>

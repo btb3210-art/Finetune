@@ -1,0 +1,63 @@
+import json
+import pathlib
+import os
+ROOT=os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),'..'))+'/'
+os.chdir(os.path.dirname(os.path.abspath(__file__))); os.makedirs('dist', exist_ok=True)
+L=ROOT+'lib/'
+osmd=open(L+'opensheetmusicdisplay-1.9.9/build/opensheetmusicdisplay.min.js').read()
+pdf=open(L+'pdfjs-dist-3.11.174/build/pdf.min.js').read()
+worker=open(L+'pdfjs-dist-3.11.174/build/pdf.worker.min.js').read()
+_I=json.load(open(ROOT+'inst/inst.json')); _v,_c=_I['violin'],_I['cello']
+_va={'label':'비올라','sustain':True,'samples':{**{k:_c['samples'][k] for k in ('48','52')},**{k:_v['samples'][k] for k in ('55','60','64','67','72')}},'tune':{**{k:(_c.get('tune') or {}).get(k,0) for k in ('48','52')},**{k:(_v.get('tune') or {}).get(k,0) for k in ('55','60','64','67','72')}}}
+_I2={}
+for k,v in _I.items():
+    _I2[k]=v
+    if k=='violin': _I2['viola']=_va
+inst=json.dumps(_I2,ensure_ascii=False); builtin=open(ROOT+'etudes/builtin.json').read().replace('</','<\\/'); css=open('app.css').read(); body=open('body.html').read(); js=open('app.js').read()
+html=f'''<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>파인튠</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>{css}</style></head><body>
+{body}
+<script>{osmd}</script>
+<script>{pdf}</script>
+<script type="text/plain" id="pdfWorkerSrc">{worker}</script>
+<script type="application/json" id="instData">{inst}</script>
+<script type="application/json" id="builtinData">{builtin}</script>
+<script>{js}</script>
+</body></html>'''
+pathlib.Path('dist').mkdir(exist_ok=True)
+open('dist/practice-coach.html','w').write(html)
+print(len(html))
+
+# claude.ai artifact variant (page content only; the platform adds the document skeleton)
+art=f'''<title>파인튠</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>{css}</style>
+{body}
+<script>{osmd}</script>
+<script>{pdf}</script>
+<script type="text/plain" id="pdfWorkerSrc">{worker}</script>
+<script type="application/json" id="instData">{inst}</script>
+<script type="application/json" id="builtinData">{builtin}</script>
+<script>{js}</script>
+'''
+open('dist/practice-coach-artifact.html','w').write(art)
+
+# installable web app (PWA) version: same page + manifest, icons and offline service worker
+pwa = html.replace('<title>파인튠</title>', '''<title>파인튠</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2b59c3">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="파인튠">''', 1)
+pwa = pwa.replace('</body></html>', '''<script>if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(function(){});</script>
+</body></html>''')
+open(ROOT+'pwa/index.html','w').write(pwa)
