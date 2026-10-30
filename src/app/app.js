@@ -1667,9 +1667,27 @@ const SAMPLE_XML = buildSampleXML();
 /* ---------------- boot ---------------- */
 let resizeT = null;
 window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (mode==='score' && osmd && osmd.Sheet && !session) { osmd.render(); osmd.cursor.show(); buildCursorTimes(); attachNoteHandlers(); addPracticeHotspots(); if (lastSession && lastSession.results && lastSession.mode==='score') colorNotes(lastSession.results); } }, 300); });
+// settings popover: keep it inside the screen, close on outside tap
+function initSettingsPopover(){
+  const d = $('settings'); if (!d) return;
+  const panel = d.querySelector('.settings-panel'), sum = d.querySelector('summary');
+  const place = () => {
+    if (!d.open) { d.classList.remove('placed'); return; }
+    d.classList.add('placed');
+    const vw = document.documentElement.clientWidth, vh = window.innerHeight, m = 12;
+    const r = sum.getBoundingClientRect(), w = panel.offsetWidth, h = panel.offsetHeight;
+    let left = r.right - w; if (left + w > vw - m) left = vw - m - w; if (left < m) left = m;
+    let top = r.bottom + 8; if (top + h > vh - m) top = Math.max(m, vh - m - h);
+    panel.style.left = left + 'px'; panel.style.top = top + 'px';
+  };
+  d.addEventListener('toggle', place);
+  window.addEventListener('resize', place);
+  window.addEventListener('scroll', place, { passive: true });
+  document.addEventListener('click', (ev) => { if (d.open && !panel.contains(ev.target) && !sum.contains(ev.target)) d.open = false; });
+}
 async function boot(){
   if (window.claude) document.body.classList.add('nomic');
-  bindSettings(); drawGaugeTicks(); initSongs();
+  bindSettings(); initSettingsPopover(); drawGaugeTicks(); initSongs();
   try { pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([$('pdfWorkerSrc').textContent], { type:'text/javascript' })); } catch(e) {}
   initOSMD();
   loadNoScore();

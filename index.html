@@ -92,6 +92,14 @@ details.settings > summary::-webkit-details-marker{display:none}
 .settings-panel{position:absolute;z-index:30;right:0;top:calc(100% + 8px);width:min(380px,calc(100vw - 32px));
   background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;box-shadow:0 12px 32px rgba(10,20,40,.18);
   display:grid;grid-template-columns:1fr auto;gap:10px 12px;align-items:center;font-size:14px}
+.settings-panel{max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+/* placed by placeSettings(): fixed, clamped inside the viewport */
+details.settings.placed > .settings-panel{position:fixed;right:auto}
+.settings-backdrop{display:none}
+@media (max-width:600px){
+  details.settings[open] > .settings-backdrop{display:block;position:fixed;inset:0;z-index:29;background:rgba(10,20,40,.35)}
+  details.settings.placed > .settings-panel{left:12px!important;right:12px;top:50%!important;transform:translateY(-50%);width:auto;max-height:calc(100dvh - 24px)}
+}
 .settings-panel .full{grid-column:1/-1}
 .settings-panel .hint{font-size:12px;color:var(--ink-3);grid-column:1/-1;margin-top:-6px}
 .settings-panel hr{grid-column:1/-1;border:0;border-top:1px solid var(--line);margin:2px 0;width:100%}
@@ -484,6 +492,7 @@ body.nomic .ns-notes{display:none}
     <button class="btn more-toggle" id="moreBtn" type="button">구간·메트로놈·설정 ▾</button>
     <details class="settings more" id="settings">
       <summary class="btn">설정</summary>
+      <div class="settings-backdrop"></div>
       <div class="settings-panel">
         <label for="a4">기준음 A4 (Hz)</label><input class="inp n" id="a4" type="number" min="415" max="450" value="440">
         <label for="transpose">악기 조성</label>
@@ -2354,9 +2363,27 @@ const SAMPLE_XML = buildSampleXML();
 /* ---------------- boot ---------------- */
 let resizeT = null;
 window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (mode==='score' && osmd && osmd.Sheet && !session) { osmd.render(); osmd.cursor.show(); buildCursorTimes(); attachNoteHandlers(); addPracticeHotspots(); if (lastSession && lastSession.results && lastSession.mode==='score') colorNotes(lastSession.results); } }, 300); });
+// settings popover: keep it inside the screen, close on outside tap
+function initSettingsPopover(){
+  const d = $('settings'); if (!d) return;
+  const panel = d.querySelector('.settings-panel'), sum = d.querySelector('summary');
+  const place = () => {
+    if (!d.open) { d.classList.remove('placed'); return; }
+    d.classList.add('placed');
+    const vw = document.documentElement.clientWidth, vh = window.innerHeight, m = 12;
+    const r = sum.getBoundingClientRect(), w = panel.offsetWidth, h = panel.offsetHeight;
+    let left = r.right - w; if (left + w > vw - m) left = vw - m - w; if (left < m) left = m;
+    let top = r.bottom + 8; if (top + h > vh - m) top = Math.max(m, vh - m - h);
+    panel.style.left = left + 'px'; panel.style.top = top + 'px';
+  };
+  d.addEventListener('toggle', place);
+  window.addEventListener('resize', place);
+  window.addEventListener('scroll', place, { passive: true });
+  document.addEventListener('click', (ev) => { if (d.open && !panel.contains(ev.target) && !sum.contains(ev.target)) d.open = false; });
+}
 async function boot(){
   if (window.claude) document.body.classList.add('nomic');
-  bindSettings(); drawGaugeTicks(); initSongs();
+  bindSettings(); initSettingsPopover(); drawGaugeTicks(); initSongs();
   try { pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([$('pdfWorkerSrc').textContent], { type:'text/javascript' })); } catch(e) {}
   initOSMD();
   loadNoScore();
