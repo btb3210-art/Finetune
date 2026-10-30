@@ -1,0 +1,6 @@
+assets/
+build/
+gen/
+obj/
+# signing key: keep it outside the repository
+release.jks
