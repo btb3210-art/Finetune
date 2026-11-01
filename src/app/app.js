@@ -625,6 +625,8 @@ function drawGaugeTicks(){
 }
 function drawGaugeTol(){ document.documentElement.style.setProperty('--tol', (2*S.tolC) + '%'); const [x1,y1]=gaugePoint(-S.tolC,110), [x2,y2]=gaugePoint(S.tolC,110); $('gTol').setAttribute('d', `M${x1} ${y1} A110 110 0 0 1 ${x2} ${y2}`); }
 let needleC = 0, lastTunerVoice = 0;
+const TUNER_STATUS = { ok: '정확해요 ✓', sharp: '높아요 ▼ 조금 내리세요', flat: '낮아요 ▲ 조금 올리세요', wait: '소리를 기다리는 중…', demo: '예시 음', '': '' };
+function setTunerStatus(k){ const el = $('tStatus'); if (!el || el.dataset.k === k) return; el.dataset.k = k; el.textContent = TUNER_STATUS[k]; }
 function updateTuner(fr, target){
   const now = performance.now();
   if (fr.f > 0) {
@@ -642,9 +644,10 @@ function updateTuner(fr, target){
     $('tCents').textContent = fmtSigned(Math.round(needleC)) + ' c';
     const col = Math.abs(needleC) <= S.tolC ? 'var(--good)' : (needleC>0 ? 'var(--sharp)' : 'var(--flat)');
     $('gNeedle').setAttribute('stroke', col); $('tCents').style.color = col;
+    setTunerStatus(Math.abs(needleC) <= S.tolC ? 'ok' : (needleC>0 ? 'sharp' : 'flat'));
   } else if (now - lastTunerVoice > 400) {
     $('tNote').textContent = '–'; $('tOct').textContent=''; $('tHz').textContent='– Hz'; $('tCents').textContent='±0 c'; $('tCents').style.color=''; $('gNeedle').setAttribute('stroke','var(--ink-3)');
-    needleC *= 0.85;
+    setTunerStatus('wait'); needleC *= 0.85;
   }
   { const mm = $('mmNeedle'); if (mm) { mm.style.left = (50 + clamp(needleC, -50, 50)) + '%'; mm.style.background = $('gNeedle').getAttribute('stroke'); } }
   const [x,y] = gaugePoint(needleC, 92); $('gNeedle').setAttribute('x2', x.toFixed(1)); $('gNeedle').setAttribute('y2', y.toFixed(1));
@@ -966,10 +969,10 @@ function showDemoNote(n){
   $('tNote').textContent = NAMES[((w%12)+12)%12]; $('tOct').textContent = Math.floor(w/12)-1;
   $('tTarget').innerHTML = `예시 음: <b>${midiName(w)}</b> <span style="color:var(--ink-3)">(${SOLFA[((w%12)+12)%12]}) · ${DUR_LABEL(n.baseDur || n.durQ)}</span>`;
   $('tHz').textContent = (S.a4*Math.pow(2,(snd-69)/12)).toFixed(1) + ' Hz';
-  $('tCents').textContent = '예시'; $('tCents').style.color = 'var(--accent)';
+  $('tCents').textContent = '예시'; $('tCents').style.color = 'var(--accent)'; setTunerStatus('demo');
   $('gNeedle').setAttribute('stroke','var(--accent)'); const [x,y] = gaugePoint(0, 92); $('gNeedle').setAttribute('x2', x); $('gNeedle').setAttribute('y2', y);
 }
-function resetDemoTuner(){ const mm = $('mmNeedle'); if (mm) { mm.style.left = '50%'; mm.style.background = ''; } demoShown = undefined; showDemoNote(null); $('tCents').textContent = '±0 c'; $('tCents').style.color = ''; $('gNeedle').setAttribute('stroke','var(--ink-3)'); $('tTarget').innerHTML = '악보 음: <b>–</b>'; }
+function resetDemoTuner(){ const mm = $('mmNeedle'); if (mm) { mm.style.left = '50%'; mm.style.background = ''; } demoShown = undefined; showDemoNote(null); $('tCents').textContent = '±0 c'; $('tCents').style.color = ''; $('gNeedle').setAttribute('stroke','var(--ink-3)'); $('tTarget').innerHTML = '악보 음: <b>–</b>'; setTunerStatus(''); }
 
 /* ---------------- independent metronome (free / personal practice) ---------------- */
 const metro = { on:false, timer:null, cur:null, clicks:[], k:0 };
@@ -1685,9 +1688,19 @@ function initSettingsPopover(){
   window.addEventListener('scroll', place, { passive: true });
   document.addEventListener('click', (ev) => { if (d.open && !panel.contains(ev.target) && !sum.contains(ev.target)) d.open = false; });
 }
+// phone: score buttons live in a menu opened from the top bar
+function initScoreMenu(){
+  const btn = $('menuBtn'), group = $('scoreGroup'), back = $('menuBackdrop');
+  const set = (open) => { document.body.classList.toggle('menu-open', open); btn.setAttribute('aria-expanded', open); };
+  btn.onclick = () => set(!document.body.classList.contains('menu-open'));
+  back.onclick = () => set(false);
+  group.addEventListener('click', (ev) => { if (ev.target.closest('.btn')) set(false); });
+  const sync = () => { $('curTitle').textContent = $('fileName').textContent; };
+  new MutationObserver(sync).observe($('fileName'), { childList: true, characterData: true, subtree: true }); sync();
+}
 async function boot(){
   if (window.claude) document.body.classList.add('nomic');
-  bindSettings(); initSettingsPopover(); drawGaugeTicks(); initSongs();
+  bindSettings(); initSettingsPopover(); initScoreMenu(); drawGaugeTicks(); initSongs();
   try { pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([$('pdfWorkerSrc').textContent], { type:'text/javascript' })); } catch(e) {}
   initOSMD();
   loadNoScore();
@@ -1696,6 +1709,6 @@ async function boot(){
   document.addEventListener('keydown', (ev) => { if (ev.code === 'Space' && !/INPUT|SELECT|TEXTAREA|BUTTON/.test(document.activeElement.tagName)) { ev.preventDefault(); startPractice(); } });
 }
 // test hooks
-window.__coach = { get master(){return master;}, get ctx(){return ctx;}, loadInstrument, instCache, playTone, makeProcessor, yin, detectOnsets, analyzeScore, analyzeFree, analyzeAndReport, get score(){return score;}, S, setLast(s){ lastSession = s; }, buildClicks };
+window.__coach = { get master(){return master;}, updateTuner, get ctx(){return ctx;}, loadInstrument, instCache, playTone, makeProcessor, yin, detectOnsets, analyzeScore, analyzeFree, analyzeAndReport, get score(){return score;}, S, setLast(s){ lastSession = s; }, buildClicks };
 boot();
 })();

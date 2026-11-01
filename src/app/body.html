@@ -7,10 +7,13 @@
     <div class="spacer"></div>
     <span class="chip" id="micChip"><span class="dot"></span><span id="micText">마이크 꺼짐</span></span>
     <span class="chip" id="latChip" title="소리 지연 보정값"><span class="num" id="latText">지연 보정 0ms</span></span>
+    <span class="cur-title" id="curTitle">개인 연습</span>
+    <button class="menu-btn" id="menuBtn" type="button" aria-label="악보 메뉴" aria-expanded="false" aria-controls="scoreGroup"><span></span><span></span><span></span></button>
   </header>
+  <div class="menu-backdrop" id="menuBackdrop"></div>
 
   <section class="rail" aria-label="연습 설정">
-    <div class="group">
+    <div class="group score-group" id="scoreGroup">
       <span class="glabel">악보</span>
       <div class="row">
         <button class="btn songs-btn" id="songsBtn" type="button">내 곡 <span class="cnt" id="songCount"></span></button>
@@ -136,9 +139,10 @@
           <g id="gTicks"></g>
           <line id="gNeedle" x1="130" y1="110" x2="130" y2="18" stroke="var(--ink-3)" stroke-width="3" stroke-linecap="round"/>
           <circle cx="130" cy="110" r="6" fill="var(--ink)"/>
-          <text x="22" y="98" font-size="11" fill="var(--ink-3)">낮음</text><text x="215" y="98" font-size="11" fill="var(--ink-3)">높음</text>
+          <text x="18" y="98" font-size="12" fill="var(--flat)">♭ 낮음</text><text x="242" y="98" font-size="12" fill="var(--sharp)" text-anchor="end">높음 ♯</text>
         </svg>
         <div class="cents-read" id="tCents">±0 c</div>
+        <div class="tuner-status" id="tStatus"></div>
         <div class="mini-meter" aria-hidden="true"><span class="mm-tol"></span><span class="mm-mid"></span><i id="mmNeedle"></i></div>
         <div class="tuner-meta"><span class="num" id="tHz">– Hz</span><span id="tLevel">입력 –</span></div>
       </div>
