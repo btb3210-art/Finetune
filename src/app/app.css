@@ -119,6 +119,8 @@ details.settings.placed > .settings-panel{position:fixed;right:auto}
 .tuner-status{text-align:center;font-size:14px;font-weight:700;min-height:20px;margin-top:2px;color:var(--ink-2)}
 .tuner-status[data-k=ok]{color:var(--good)} .tuner-status[data-k=sharp]{color:var(--sharp)} .tuner-status[data-k=flat]{color:var(--flat)} .tuner-status[data-k=demo]{color:var(--accent)}
 .cur-title,.menu-btn,.menu-backdrop{display:none}
+.toast{position:fixed;z-index:50;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);padding:12px 14px;border-radius:12px;background:var(--ink);color:var(--surface);font-size:14px;line-height:1.5;box-shadow:0 8px 24px rgba(10,20,40,.3)}
+.toast.err{background:var(--bad);color:#fff}
 .rail2{display:none}
 .sub-btns{display:inline-flex;gap:4px;margin-left:4px}
 .sub-btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:3px 8px;min-width:64px}
@@ -332,6 +334,7 @@ svg rect.mhot.tap2{fill:rgba(43,89,195,.30)}
   .rail .go #metroBtn{grid-area:metro}
   .rail .go #tunerBtn{grid-area:tuner}
   .rail .go #metroBtn[hidden] + #tunerBtn{grid-column:1/-1}
+  body.nomic .rail .go #metroBtn{grid-column:1/-1}
   .rail .go .btn{padding-block:10px}
   .rail2{display:flex;flex-direction:column;align-items:stretch;order:-1}
   .rail2 > .group,.rail2 > details{width:100%}

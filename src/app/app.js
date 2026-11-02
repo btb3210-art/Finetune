@@ -306,7 +306,7 @@ async function loadPdf(arrBuf, name){
   mode = 'free'; setModeUI();
   const view = $('pdfView'); view.innerHTML = ''; view.hidden = false; $('osmd').hidden = true; if (osmd) { try { osmd.cursor.hide(); } catch(e){} }
   try {
-    const pdf = await pdfjsLib.getDocument({ data: arrBuf }).promise;
+    const pdf = await pdfjsLib.getDocument({ data: arrBuf, isEvalSupported: false }).promise;
     for (let p=1; p<=pdf.numPages; p++){
       const page = await pdf.getPage(p);
       const w = Math.min(1600, view.clientWidth*(window.devicePixelRatio||1)*1.2 || 1200);
@@ -875,7 +875,7 @@ async function startSession(demo, opts){
   if (demo) { if (mode !== 'score' || !score) return; await ensureAudio(); startLoop(); }
   else if (!(await ensureMic())) {
     // no microphone (phone browser, claude.ai page, or permission refused): follow the score with metronome only
-    if (mode === 'free') { await ensureAudio(); startLoop(); toggleMetro(true); flash('이 화면에서는 마이크를 쓸 수 없어서 음정·박자를 셀 수 없어요. 메트로놈만 켰어요. 음은 [기준음]으로 맞춰 보세요.'); return; }
+    if (mode === 'free') { flash(window.claude ? 'Claude 앱 안에서는 마이크를 쓸 수 없어서 연습을 들을 수 없어요. 메트로놈은 [메트로놈 켜기], 음은 튜너 아래 음 버튼으로 맞춰 보세요. 튜너로 소리를 들으려면 설치한 파인튠 앱이나 웹 주소에서 여세요.' : '마이크를 쓸 수 없어서 연습을 들을 수 없어요. 마이크 사용을 허용했는지 확인해 주세요. 메트로놈은 [메트로놈 켜기]로 따로 켤 수 있어요.'); return; }
     if (mode === 'score' && !score) return;
     await ensureAudio(); startLoop(); demo = true; opts.follow = true;
   }
@@ -1588,7 +1588,13 @@ function showTip(html, x, y, ms){ const t = $('tip'); t.innerHTML = html; t.hidd
 document.addEventListener('mousemove', (ev) => { const el = ev.target.closest && ev.target.closest('[data-tip]'); if (el) showTip(el.getAttribute('data-tip'), ev.clientX, ev.clientY); else if (!tipTimer || $('tip').dataset.sticky!=='1') { if (!ev.target.closest('#osmd')) $('tip').hidden = true; } });
 document.addEventListener('click', (ev) => { if (!ev.target.closest('#osmd')) $('tip').hidden = true; });
 
-function flash(text, err){ const m = $('sideMsg'); m.textContent = text; m.classList.toggle('err', !!err); }
+let toastTimer = null;
+function flash(text, err){ const m = $('sideMsg'); m.textContent = text; m.classList.toggle('err', !!err);
+  // phones hide the side card that holds this message: show it briefly at the bottom instead
+  if (!window.matchMedia('(max-width:700px)').matches) return;
+  const t = $('toast'); t.textContent = text; t.classList.toggle('err', !!err); t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, Math.min(9000, 2500 + text.length*60));
+}
 
 /* ---------------- history ---------------- */
 function loadHistory(){ try { return JSON.parse(localStorage.getItem(LS_HIST) || '[]'); } catch(e) { return []; } }

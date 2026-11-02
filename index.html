@@ -132,6 +132,8 @@ details.settings.placed > .settings-panel{position:fixed;right:auto}
 .tuner-status{text-align:center;font-size:14px;font-weight:700;min-height:20px;margin-top:2px;color:var(--ink-2)}
 .tuner-status[data-k=ok]{color:var(--good)} .tuner-status[data-k=sharp]{color:var(--sharp)} .tuner-status[data-k=flat]{color:var(--flat)} .tuner-status[data-k=demo]{color:var(--accent)}
 .cur-title,.menu-btn,.menu-backdrop{display:none}
+.toast{position:fixed;z-index:50;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);padding:12px 14px;border-radius:12px;background:var(--ink);color:var(--surface);font-size:14px;line-height:1.5;box-shadow:0 8px 24px rgba(10,20,40,.3)}
+.toast.err{background:var(--bad);color:#fff}
 .rail2{display:none}
 .sub-btns{display:inline-flex;gap:4px;margin-left:4px}
 .sub-btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:3px 8px;min-width:64px}
@@ -345,6 +347,7 @@ svg rect.mhot.tap2{fill:rgba(43,89,195,.30)}
   .rail .go #metroBtn{grid-area:metro}
   .rail .go #tunerBtn{grid-area:tuner}
   .rail .go #metroBtn[hidden] + #tunerBtn{grid-column:1/-1}
+  body.nomic .rail .go #metroBtn{grid-column:1/-1}
   .rail .go .btn{padding-block:10px}
   .rail2{display:flex;flex-direction:column;align-items:stretch;order:-1}
   .rail2 > .group,.rail2 > details{width:100%}
@@ -531,6 +534,7 @@ body.nomic .ns-notes{display:none}
     <button class="menu-btn" id="menuBtn" type="button" aria-label="악보 메뉴" aria-expanded="false" aria-controls="scoreGroup"><span></span><span></span><span></span></button>
   </header>
   <div class="menu-backdrop" id="menuBackdrop"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
   <div class="rp-back" id="rhythmBack" hidden></div>
   <div class="rhythm-pop" id="rhythmPop" role="dialog" aria-label="메트로놈 리듬 고르기" hidden>
     <div class="rp-head"><b>메트로놈 리듬</b><small>한 박을 이렇게 쪼개서 울려요</small></div>
@@ -1122,7 +1126,7 @@ async function loadPdf(arrBuf, name){
   mode = 'free'; setModeUI();
   const view = $('pdfView'); view.innerHTML = ''; view.hidden = false; $('osmd').hidden = true; if (osmd) { try { osmd.cursor.hide(); } catch(e){} }
   try {
-    const pdf = await pdfjsLib.getDocument({ data: arrBuf }).promise;
+    const pdf = await pdfjsLib.getDocument({ data: arrBuf, isEvalSupported: false }).promise;
     for (let p=1; p<=pdf.numPages; p++){
       const page = await pdf.getPage(p);
       const w = Math.min(1600, view.clientWidth*(window.devicePixelRatio||1)*1.2 || 1200);
@@ -1691,7 +1695,7 @@ async function startSession(demo, opts){
   if (demo) { if (mode !== 'score' || !score) return; await ensureAudio(); startLoop(); }
   else if (!(await ensureMic())) {
     // no microphone (phone browser, claude.ai page, or permission refused): follow the score with metronome only
-    if (mode === 'free') { await ensureAudio(); startLoop(); toggleMetro(true); flash('이 화면에서는 마이크를 쓸 수 없어서 음정·박자를 셀 수 없어요. 메트로놈만 켰어요. 음은 [기준음]으로 맞춰 보세요.'); return; }
+    if (mode === 'free') { flash(window.claude ? 'Claude 앱 안에서는 마이크를 쓸 수 없어서 연습을 들을 수 없어요. 메트로놈은 [메트로놈 켜기], 음은 튜너 아래 음 버튼으로 맞춰 보세요. 튜너로 소리를 들으려면 설치한 파인튠 앱이나 웹 주소에서 여세요.' : '마이크를 쓸 수 없어서 연습을 들을 수 없어요. 마이크 사용을 허용했는지 확인해 주세요. 메트로놈은 [메트로놈 켜기]로 따로 켤 수 있어요.'); return; }
     if (mode === 'score' && !score) return;
     await ensureAudio(); startLoop(); demo = true; opts.follow = true;
   }
@@ -2404,7 +2408,13 @@ function showTip(html, x, y, ms){ const t = $('tip'); t.innerHTML = html; t.hidd
 document.addEventListener('mousemove', (ev) => { const el = ev.target.closest && ev.target.closest('[data-tip]'); if (el) showTip(el.getAttribute('data-tip'), ev.clientX, ev.clientY); else if (!tipTimer || $('tip').dataset.sticky!=='1') { if (!ev.target.closest('#osmd')) $('tip').hidden = true; } });
 document.addEventListener('click', (ev) => { if (!ev.target.closest('#osmd')) $('tip').hidden = true; });
 
-function flash(text, err){ const m = $('sideMsg'); m.textContent = text; m.classList.toggle('err', !!err); }
+let toastTimer = null;
+function flash(text, err){ const m = $('sideMsg'); m.textContent = text; m.classList.toggle('err', !!err);
+  // phones hide the side card that holds this message: show it briefly at the bottom instead
+  if (!window.matchMedia('(max-width:700px)').matches) return;
+  const t = $('toast'); t.textContent = text; t.classList.toggle('err', !!err); t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, Math.min(9000, 2500 + text.length*60));
+}
 
 /* ---------------- history ---------------- */
 function loadHistory(){ try { return JSON.parse(localStorage.getItem(LS_HIST) || '[]'); } catch(e) { return []; } }
