@@ -119,6 +119,16 @@ details.settings.placed > .settings-panel{position:fixed;right:auto}
 .tuner-status{text-align:center;font-size:14px;font-weight:700;min-height:20px;margin-top:2px;color:var(--ink-2)}
 .tuner-status[data-k=ok]{color:var(--good)} .tuner-status[data-k=sharp]{color:var(--sharp)} .tuner-status[data-k=flat]{color:var(--flat)} .tuner-status[data-k=demo]{color:var(--accent)}
 .cur-title,.menu-btn,.menu-backdrop{display:none}
+.tpad{margin-top:10px;border-top:1px solid var(--line);padding-top:10px;display:flex;gap:6px;align-items:stretch}
+.tpad-keys{flex:1;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.tkey{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:8px 0;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink);cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none;min-width:0}
+.tkey b{font-size:18px;line-height:1.1}
+.tkey small{font-size:10.5px;color:var(--ink-3)}
+.tkey.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.tkey.on small{color:var(--accent-ink);opacity:.85}
+.tpad-oct{display:flex;flex-direction:column;align-items:center;justify-content:space-between;width:40px;flex:none;border:1px solid var(--line);border-radius:10px;background:var(--surface);overflow:hidden}
+.tpad-oct button{border:0;background:none;color:var(--ink-2);font-size:12px;padding:3px 0;width:100%;cursor:pointer;touch-action:manipulation}
+.tpad-oct b{font-size:17px;line-height:1}
 .beats{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;min-height:22px}
 .beats i{width:18px;height:18px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);transition:background .05s}
 .beats i.on{background:var(--accent);border-color:var(--accent)}
@@ -306,6 +316,27 @@ svg rect.mhot.tap2{fill:rgba(43,89,195,.30)}
   .side .card:nth-child(2){flex-direction:row;gap:12px;min-width:0;padding-block:6px}
   .beats{max-width:none}
   #posText{margin-top:0!important}
+  .side .card.tuner{grid-template-areas:"target target" "note gauge" "cents gauge" "status status" "meta meta" "pad pad"}
+  .side .card.tuner .tpad{grid-area:pad}
+  .side .card.tuner #gauge{max-height:140px}
+  .tuner-note .big{font-size:54px}
+  /* with a score open the tuner stays pinned and compact: hide the note pad */
+  body:not(.ns-mode) .side .card.tuner .tpad{display:none}
+  /* practice without a score: big tuner like a stand-alone tuner app, not pinned */
+  body.ns-mode .side{position:static}
+  body.ns-mode .side .card.tuner{padding:14px 12px;grid-template-columns:repeat(3,minmax(0,1fr));
+    grid-template-areas:"note cents hz" "gauge gauge gauge" "status status status" "target target target" "pad pad pad" "level level level"}
+  body.ns-mode .side .card.tuner .tuner-meta{display:contents}
+  body.ns-mode .side .card.tuner #tHz{grid-area:hz;text-align:center;font-size:20px;white-space:nowrap;font-weight:600;align-self:center}
+  body.ns-mode .side .card.tuner #tLevel{grid-area:level;text-align:center;font-size:12px;color:var(--ink-3);margin-top:6px}
+  body.ns-mode .side .card.tuner .tuner-note{align-self:center;justify-content:center;min-width:0}
+  body.ns-mode .side .card.tuner .tuner-note .big{font-size:64px}
+  body.ns-mode .side .card.tuner .tuner-note .oct{font-size:22px}
+  body.ns-mode .side .card.tuner .cents-read{align-self:center;font-size:28px}
+  body.ns-mode .side .card.tuner #gauge{max-height:none;margin-top:4px}
+  body.ns-mode .side .card.tuner .tuner-status{font-size:20px;padding:4px 0}
+  body.ns-mode .side .card.tuner .tuner-target{margin-top:2px}
+  body.ns-mode .tkey{padding:12px 0} body.ns-mode .tkey b{font-size:21px} body.ns-mode .tpad-oct{width:44px} body.ns-mode .tpad-oct b{font-size:19px}
 }
 
 /* practice without a score */
