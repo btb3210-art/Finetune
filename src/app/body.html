@@ -11,6 +11,11 @@
     <button class="menu-btn" id="menuBtn" type="button" aria-label="악보 메뉴" aria-expanded="false" aria-controls="scoreGroup"><span></span><span></span><span></span></button>
   </header>
   <div class="menu-backdrop" id="menuBackdrop"></div>
+  <div class="rp-back" id="rhythmBack" hidden></div>
+  <div class="rhythm-pop" id="rhythmPop" role="dialog" aria-label="메트로놈 리듬 고르기" hidden>
+    <div class="rp-head"><b>메트로놈 리듬</b><small>한 박을 이렇게 쪼개서 울려요</small></div>
+    <div class="rp-grid" id="rhythmGrid"></div>
+  </div>
 
   <section class="rail" aria-label="연습 설정">
     <div class="group score-group" id="scoreGroup">
@@ -50,9 +55,8 @@
         <button class="btn sm" id="bpmDown" aria-label="템포 내리기">−</button>
         <input class="bpm" id="bpm" type="number" min="20" max="300" value="80">
         <button class="btn sm" id="bpmUp" aria-label="템포 올리기">+</button>
-        <span class="sub-btns" role="group" aria-label="박 쪼개기 (메트로놈)">
-          <button class="btn sm sub-btn" type="button" data-sub="2" title="8분음표로 쪼개서 듣기 (한 번 더 누르면 끄기)" aria-label="8분음표로 쪼개기"><svg viewBox="0 0 34 26" aria-hidden="true"><ellipse cx="4.0" cy="21" rx="3.2" ry="2.4" transform="rotate(-20 4.0 21)"/><rect x="6.4" y="4" width="1.4" height="17"/><ellipse cx="28.0" cy="21" rx="3.2" ry="2.4" transform="rotate(-20 28.0 21)"/><rect x="30.4" y="4" width="1.4" height="17"/><rect x="6.4" y="4" width="25.4" height="2.4"/></svg></button>
-          <button class="btn sm sub-btn" type="button" data-sub="4" title="16분음표로 쪼개서 듣기 (한 번 더 누르면 끄기)" aria-label="16분음표로 쪼개기"><svg viewBox="0 0 34 26" aria-hidden="true"><ellipse cx="4.0" cy="21" rx="3.2" ry="2.4" transform="rotate(-20 4.0 21)"/><rect x="6.4" y="4" width="1.4" height="17"/><ellipse cx="12.0" cy="21" rx="3.2" ry="2.4" transform="rotate(-20 12.0 21)"/><rect x="14.4" y="4" width="1.4" height="17"/><ellipse cx="20.0" cy="21" rx="3.2" ry="2.4" transform="rotate(-20 20.0 21)"/><rect x="22.4" y="4" width="1.4" height="17"/><ellipse cx="28.0" cy="21" rx="3.2" ry="2.4" transform="rotate(-20 28.0 21)"/><rect x="30.4" y="4" width="1.4" height="17"/><rect x="6.4" y="4" width="25.4" height="2.4"/><rect x="6.4" y="8" width="25.4" height="2.4"/></svg></button>
+        <span class="sub-btns">
+          <button class="btn sm sub-btn" id="rhythmBtn" type="button" aria-haspopup="dialog" aria-expanded="false" title="메트로놈 리듬 고르기"></button>
         </span>
         <input type="range" id="bpmRange" min="30" max="240" value="80" aria-label="템포 슬라이더">
       </div>

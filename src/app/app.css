@@ -121,9 +121,20 @@ details.settings.placed > .settings-panel{position:fixed;right:auto}
 .cur-title,.menu-btn,.menu-backdrop{display:none}
 .rail2{display:none}
 .sub-btns{display:inline-flex;gap:4px;margin-left:4px}
-.sub-btn{display:inline-flex;align-items:center;justify-content:center;padding:4px 8px}
-.sub-btn svg{width:30px;height:23px;fill:currentColor;display:block}
+.sub-btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:3px 8px;min-width:64px}
+.sub-btn svg,.rp-grid svg{height:26px;fill:currentColor;display:block}
+.sub-btn svg text,.rp-grid svg text{fill:currentColor}
+.sub-btn .rb-caret{font-size:11px;opacity:.7}
 .sub-btn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.rp-back{position:fixed;inset:0;z-index:44}
+.rhythm-pop{position:fixed;z-index:45;width:min(400px,calc(100vw - 24px));background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px;box-shadow:0 12px 32px rgba(10,20,40,.25)}
+.rp-head{display:flex;align-items:baseline;gap:8px;margin-bottom:10px;font-size:14px}
+.rp-head small{color:var(--ink-3);font-size:12px}
+.rp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:6px}
+.rp-grid button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 4px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink);cursor:pointer;touch-action:manipulation}
+.rp-grid button small{font-size:11px;color:var(--ink-2);text-align:center;line-height:1.25}
+.rp-grid button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.rp-grid button.on small{color:var(--accent-ink)}
 .tpad{margin-top:10px;border-top:1px solid var(--line);padding-top:10px;display:flex;gap:6px;align-items:stretch}
 .tpad-keys{flex:1;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
 .tkey{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:8px 0;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink);cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none;min-width:0}
@@ -317,7 +328,7 @@ svg rect.mhot.tap2{fill:rgba(43,89,195,.30)}
   .rail .go #playBtn{grid-area:play;align-self:stretch;margin:0}
   .rail input[type=range]#bpmRange{grid-area:range;width:100%}
   .rail .sub-btns{grid-area:sub;margin:0}
-  .rail .sub-btn{height:36px}
+  .rail .sub-btn{height:36px;min-width:84px}
   .rail .go #metroBtn{grid-area:metro}
   .rail .go #tunerBtn{grid-area:tuner}
   .rail .go #metroBtn[hidden] + #tunerBtn{grid-column:1/-1}

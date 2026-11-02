@@ -134,9 +134,20 @@ details.settings.placed > .settings-panel{position:fixed;right:auto}
 .cur-title,.menu-btn,.menu-backdrop{display:none}
 .rail2{display:none}
 .sub-btns{display:inline-flex;gap:4px;margin-left:4px}
-.sub-btn{display:inline-flex;align-items:center;justify-content:center;padding:4px 8px}
-.sub-btn svg{width:30px;height:23px;fill:currentColor;display:block}
+.sub-btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:3px 8px;min-width:64px}
+.sub-btn svg,.rp-grid svg{height:26px;fill:currentColor;display:block}
+.sub-btn svg text,.rp-grid svg text{fill:currentColor}
+.sub-btn .rb-caret{font-size:11px;opacity:.7}
 .sub-btn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.rp-back{position:fixed;inset:0;z-index:44}
+.rhythm-pop{position:fixed;z-index:45;width:min(400px,calc(100vw - 24px));background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px;box-shadow:0 12px 32px rgba(10,20,40,.25)}
+.rp-head{display:flex;align-items:baseline;gap:8px;margin-bottom:10px;font-size:14px}
+.rp-head small{color:var(--ink-3);font-size:12px}
+.rp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:6px}
+.rp-grid button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 4px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink);cursor:pointer;touch-action:manipulation}
+.rp-grid button small{font-size:11px;color:var(--ink-2);text-align:center;line-height:1.25}
+.rp-grid button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.rp-grid button.on small{color:var(--accent-ink)}
 .tpad{margin-top:10px;border-top:1px solid var(--line);padding-top:10px;display:flex;gap:6px;align-items:stretch}
 .tpad-keys{flex:1;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
 .tkey{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:8px 0;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink);cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none;min-width:0}
@@ -330,7 +341,7 @@ svg rect.mhot.tap2{fill:rgba(43,89,195,.30)}
   .rail .go #playBtn{grid-area:play;align-self:stretch;margin:0}
   .rail input[type=range]#bpmRange{grid-area:range;width:100%}
   .rail .sub-btns{grid-area:sub;margin:0}
-  .rail .sub-btn{height:36px}
+  .rail .sub-btn{height:36px;min-width:84px}
   .rail .go #metroBtn{grid-area:metro}
   .rail .go #tunerBtn{grid-area:tuner}
   .rail .go #metroBtn[hidden] + #tunerBtn{grid-column:1/-1}
@@ -520,6 +531,11 @@ body.nomic .ns-notes{display:none}
     <button class="menu-btn" id="menuBtn" type="button" aria-label="악보 메뉴" aria-expanded="false" aria-controls="scoreGroup"><span></span><span></span><span></span></button>
   </header>
   <div class="menu-backdrop" id="menuBackdrop"></div>
+  <div class="rp-back" id="rhythmBack" hidden></div>
+  <div class="rhythm-pop" id="rhythmPop" role="dialog" aria-label="메트로놈 리듬 고르기" hidden>
+    <div class="rp-head"><b>메트로놈 리듬</b><small>한 박을 이렇게 쪼개서 울려요</small></div>
+    <div class="rp-grid" id="rhythmGrid"></div>
+  </div>
 
   <section class="rail" aria-label="연습 설정">
     <div class="group score-group" id="scoreGroup">
@@ -559,9 +575,8 @@ body.nomic .ns-notes{display:none}
         <button class="btn sm" id="bpmDown" aria-label="템포 내리기">−</button>
         <input class="bpm" id="bpm" type="number" min="20" max="300" value="80">
         <button class="btn sm" id="bpmUp" aria-label="템포 올리기">+</button>
-        <span class="sub-btns" role="group" aria-label="박 쪼개기 (메트로놈)">
-          <button class="btn sm sub-btn" type="button" data-sub="2" title="8분음표로 쪼개서 듣기 (한 번 더 누르면 끄기)" aria-label="8분음표로 쪼개기"><svg viewBox="0 0 34 26" aria-hidden="true"><ellipse cx="4.0" cy="21" rx="3.2" ry="2.4" transform="rotate(-20 4.0 21)"/><rect x="6.4" y="4" width="1.4" height="17"/><ellipse cx="28.0" cy="21" rx="3.2" ry="2.4" transform="rotate(-20 28.0 21)"/><rect x="30.4" y="4" width="1.4" height="17"/><rect x="6.4" y="4" width="25.4" height="2.4"/></svg></button>
-          <button class="btn sm sub-btn" type="button" data-sub="4" title="16분음표로 쪼개서 듣기 (한 번 더 누르면 끄기)" aria-label="16분음표로 쪼개기"><svg viewBox="0 0 34 26" aria-hidden="true"><ellipse cx="4.0" cy="21" rx="3.2" ry="2.4" transform="rotate(-20 4.0 21)"/><rect x="6.4" y="4" width="1.4" height="17"/><ellipse cx="12.0" cy="21" rx="3.2" ry="2.4" transform="rotate(-20 12.0 21)"/><rect x="14.4" y="4" width="1.4" height="17"/><ellipse cx="20.0" cy="21" rx="3.2" ry="2.4" transform="rotate(-20 20.0 21)"/><rect x="22.4" y="4" width="1.4" height="17"/><ellipse cx="28.0" cy="21" rx="3.2" ry="2.4" transform="rotate(-20 28.0 21)"/><rect x="30.4" y="4" width="1.4" height="17"/><rect x="6.4" y="4" width="25.4" height="2.4"/><rect x="6.4" y="8" width="25.4" height="2.4"/></svg></button>
+        <span class="sub-btns">
+          <button class="btn sm sub-btn" id="rhythmBtn" type="button" aria-haspopup="dialog" aria-expanded="false" title="메트로놈 리듬 고르기"></button>
         </span>
         <input type="range" id="bpmRange" min="30" max="240" value="80" aria-label="템포 슬라이더">
       </div>
@@ -1176,7 +1191,7 @@ function loadNoScore(){
   $('nsTuner').onclick = toggleTuner; setTuner(tunerOnly);
   $('nsVol').addEventListener('input', () => { S.vol = parseFloat($('nsVol').value); saveSettings(); syncVol(); }); syncVol(); renderLiveNotes(null);
   $('nsPractice').onclick = () => $('playBtn').click(); updateMetroUI();
-  $('nsSub').value = S.subdiv; $('nsSub').onchange = () => { S.subdiv = +$('nsSub').value; saveSettings(); markSub(); };
+  $('nsSub').innerHTML = RHYTHMS.map(r => `<option value="${r.id}">${r.id === '1' ? '없음' : r.name}</option>`).join(''); $('nsSub').value = curRhythm().id; $('nsSub').onchange = () => { S.subdiv = $('nsSub').value; saveSettings(); markSub(); };
   const taps = []; $('nsTap').onclick = () => { const t = performance.now(); if (taps.length && t - taps[taps.length-1] > 2000) taps.length = 0; taps.push(t); if (taps.length > 6) taps.shift();
     if (taps.length >= 3) { const iv = []; for (let k = 1; k < taps.length; k++) iv.push(taps[k] - taps[k-1]); setBpm(60000 / median(iv)); } };
   $('refStep').innerHTML = SOLFA.map((n, k) => `<option value="${k}">${n} (${NAMES[k]})</option>`).join('');
@@ -1729,7 +1744,7 @@ async function startSession(demo, opts){
         const k = sess.nextClick, t = sess.clickStart + k*sess.beatSec; if (t >= horizon) break;
         const b = k % sess.meter.n; const kind = b===0 ? 'acc' : (sess.meter.d===8 && b%3===0 ? 'mid':'norm');
         playClick(t, kind); sess.clicks.push({ t, k:b, n:sess.meter.n, kind, ci: t < sess.t0 - 1e-6 }); sess.nextClick++;
-        const sd = +S.subdiv || 1; for (let j = 1; j < sd; j++) playClick(t + j*sess.beatSec/sd, 'sub');
+        for (const f of rhythmOffsets()) playClick(t + f*sess.beatSec, 'sub');
       }
     }
   }, 25);
@@ -1813,7 +1828,7 @@ function metroStart(){
       const b = metro.k % n; const kind = b===0 ? 'acc' : (d===8 && b%3===0 ? 'mid' : 'norm');
       playClick(t, kind); const c = { t, k:b, n, kind }; metro.clicks.push(c); if (metro.clicks.length > 64) metro.clicks.shift();
       if (session && !session.demo && session.mode === 'free') session.clicks.push(c);
-      const sd = +S.subdiv || 1; for (let j = 1; j < sd; j++) playClick(t + j*beatSec/sd, 'sub');
+      for (const f of rhythmOffsets()) playClick(t + f*beatSec, 'sub');
       metro.k++;
     }
   }, 25);
@@ -2521,10 +2536,50 @@ function initScoreMenu(){
   const sync = () => { $('curTitle').textContent = $('fileName').textContent; };
   new MutationObserver(sync).observe($('fileName'), { childList: true, characterData: true, subtree: true }); sync();
 }
-// eighth / sixteenth buttons beside the tempo: metronome subdivision, tap again to turn off
-function markSub(){ document.querySelectorAll('.sub-btn').forEach(b => { const on = +b.dataset.sub === +S.subdiv; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }); if ($('nsSub')) $('nsSub').value = S.subdiv; }
+// metronome rhythm: how each beat is split (durations in 1/12 of a beat); picked from the button beside the tempo
+const RHYTHMS = [
+  { id:'1', name:'박만', d:[12] }, { id:'2', name:'8분음표', d:[6,6] }, { id:'3', name:'셋잇단음표', d:[4,4,4], tup:3 },
+  { id:'4', name:'16분음표', d:[3,3,3,3] }, { id:'d8s', name:'점8분 + 16분', d:[9,3] }, { id:'sd8', name:'16분 + 점8분', d:[3,9] },
+  { id:'8ss', name:'8분 + 16분 둘', d:[6,3,3] }, { id:'ss8', name:'16분 둘 + 8분', d:[3,3,6] }, { id:'s8s', name:'16분 + 8분 + 16분', d:[3,6,3] },
+  { id:'6', name:'6잇단음표', d:[2,2,2,2,2,2], tup:6 }
+];
+const curRhythm = () => RHYTHMS.find(r => r.id === String(S.subdiv)) || RHYTHMS[0];
+function rhythmOffsets(){ const out = []; let acc = 0; const d = curRhythm().d; for (let i = 0; i < d.length - 1; i++) { acc += d[i]; out.push(acc/12); } return out; }
+function rhythmSvg(r){
+  const n = r.d.length, step = n > 4 ? 7 : 10, w = 8 + (n-1)*step + 6, lv = (d) => d >= 12 ? 0 : (d === 3 || d === 2) ? 2 : 1;
+  const x = (i) => 4 + i*step, sx = (i) => x(i) + 2.4;
+  let g = '';
+  r.d.forEach((d, i) => { g += `<ellipse cx="${x(i)}" cy="25" rx="3.3" ry="2.4" transform="rotate(-20 ${x(i)} 25)"/><rect x="${sx(i)}" y="8" width="1.3" height="17"/>`; if (d === 9) g += `<circle cx="${x(i)+5.6}" cy="25" r="1.2"/>`; });
+  if (n > 1) {
+    g += `<rect x="${sx(0)}" y="8" width="${sx(n-1)-sx(0)+1.3}" height="2.6"/>`;
+    r.d.forEach((d, i) => { if (lv(d) < 2) return;
+      if (i+1 < n && lv(r.d[i+1]) === 2) g += `<rect x="${sx(i)}" y="12.5" width="${sx(i+1)-sx(i)+1.3}" height="2.6"/>`;
+      else if (!(i > 0 && lv(r.d[i-1]) === 2)) { const x0 = i === n-1 ? sx(i)-5 : sx(i); g += `<rect x="${x0}" y="12.5" width="6.3" height="2.6"/>`; } });
+  }
+  if (r.tup) g += `<text x="${(sx(0)+sx(n-1))/2}" y="6" font-size="7.5" font-weight="700" text-anchor="middle">${r.tup}</text>`;
+  return `<svg viewBox="0 0 ${w} 30" style="width:${w*0.9}px" aria-hidden="true">${g}</svg>`;
+}
+function markSub(){
+  const r = curRhythm();
+  $('rhythmBtn').innerHTML = rhythmSvg(r) + '<span class="rb-caret">▾</span>'; $('rhythmBtn').setAttribute('aria-label', '메트로놈 리듬: ' + r.name + ' (눌러서 바꾸기)');
+  $('rhythmBtn').classList.toggle('on', r.id !== '1');
+  document.querySelectorAll('#rhythmGrid button').forEach(b => { const on = b.dataset.r === r.id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+  if ($('nsSub')) $('nsSub').value = r.id;
+}
 function initSubButtons(){
-  document.querySelectorAll('.sub-btn').forEach(b => b.onclick = () => { const v = +b.dataset.sub; S.subdiv = +S.subdiv === v ? 1 : v; saveSettings(); markSub(); });
+  const btn = $('rhythmBtn'), pop = $('rhythmPop'), back = $('rhythmBack');
+  $('rhythmGrid').innerHTML = RHYTHMS.map(r => `<button type="button" data-r="${r.id}">${rhythmSvg(r)}<small>${r.name}</small></button>`).join('');
+  const close = () => { pop.hidden = true; back.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
+  const open = () => {
+    pop.hidden = false; back.hidden = false; btn.setAttribute('aria-expanded', 'true');
+    const vw = document.documentElement.clientWidth, vh = window.innerHeight, m = 12, r = btn.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+    let left = Math.min(Math.max(m, r.right - w), vw - m - w), top = r.bottom + 6; if (top + h > vh - m) top = Math.max(m, r.top - h - 6);
+    pop.style.left = left + 'px'; pop.style.top = top + 'px';
+  };
+  btn.onclick = () => pop.hidden ? open() : close();
+  back.onclick = close;
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !pop.hidden) close(); });
+  $('rhythmGrid').onclick = (ev) => { const b = ev.target.closest('button'); if (!b) return; S.subdiv = b.dataset.r; saveSettings(); markSub(); close(); };
   markSub();
 }
 // phone: tempo, start, metronome/tuner buttons stay on top; example playback and settings move below the tuner
