@@ -302,7 +302,7 @@ function scrollToCursor(){
 }
 
 async function loadPdf(arrBuf, name){
-  noScore = false;
+  noScore = false; document.body.classList.remove('ns-mode'); padMark();
   mode = 'free'; setModeUI();
   const view = $('pdfView'); view.innerHTML = ''; view.hidden = false; $('osmd').hidden = true; if (osmd) { try { osmd.cursor.hide(); } catch(e){} }
   try {
@@ -320,7 +320,7 @@ async function loadPdf(arrBuf, name){
   $('fileName').textContent = scoreTitle = name;
 }
 function loadImage(url, name){
-  noScore = false;
+  noScore = false; document.body.classList.remove('ns-mode'); padMark();
   mode = 'free'; setModeUI();
   const view = $('pdfView'); view.innerHTML = ''; view.hidden = false; $('osmd').hidden = true; if (osmd) { try { osmd.cursor.hide(); } catch(e){} }
   const img = new Image(); img.src = url; img.alt = name; view.appendChild(img);
@@ -328,7 +328,7 @@ function loadImage(url, name){
 }
 let noScore = false;
 function loadNoScore(){
-  stopAll(false); mode = 'free'; noScore = true; lastSession = null; $('report').hidden = true;
+  stopAll(false); mode = 'free'; noScore = true; document.body.classList.add('ns-mode'); padMark(); lastSession = null; $('report').hidden = true;
   const view = $('pdfView'); view.hidden = false; $('osmd').hidden = true; if (osmd) { try { osmd.cursor.hide(); } catch(e){} }
   view.innerHTML = `<div class="noscore">
     <div class="ns-tempo">
@@ -401,9 +401,31 @@ function startRef(){
   if ($('refBtn')) { $('refBtn').textContent = '■ 끄기'; $('refBtn').classList.add('on'); }
 }
 function stopRef(){
+  if (padNote != null) { padNote = null; padMark(); }
   if (!refOsc) return; const { o, o2, g } = refOsc; refOsc = null;
   try { g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.03); o.stop(ctx.currentTime + 0.2); o2.stop(ctx.currentTime + 0.2); } catch(e) {}
   if ($('refBtn')) { $('refBtn').textContent = '▶ 켜기'; $('refBtn').classList.remove('on'); }
+}
+/* note pad under the tuner: tap a note to hear it (written pitch for the chosen instrument) */
+let padNote = null, padOct = 4;
+function padMark(){
+  document.querySelectorAll('#tPadKeys button').forEach(b => b.classList.toggle('on', padNote != null && +b.dataset.pc === ((padNote%12)+12)%12));
+  if (padNote != null) $('tTarget').innerHTML = `기준음: <b>${midiName(padNote)}</b> <span style="color:var(--ink-3)">(${SOLFA[((padNote%12)+12)%12]}) 울리는 중</span>`;
+  else if (!session) $('tTarget').innerHTML = noScore ? '아래 음을 누르면 그 소리가 나요' : '악보 음: <b>–</b>';
+}
+async function padPlay(written){
+  if (refOsc && padNote === written) { stopRef(); return; }   // tap the same note again to stop
+  await ensureAudio(); stopRef();
+  S.refNote = written + S.transpose; saveSettings();
+  if ($('refStep')) { $('refStep').value = ((S.refNote%12)+12)%12; $('refOct').value = Math.floor(S.refNote/12) - 1; }
+  startRef(); padNote = written; padMark();
+}
+function initNotePad(){
+  const keys = [0,2,4,5,7,9,11];   // C D E F G A B
+  $('tPadKeys').innerHTML = keys.map(k => `<button type="button" class="tkey" data-pc="${k}"><b>${NAMES[k]}</b><small>${SOLFA[k]}</small></button>`).join('');
+  $('tPadKeys').onclick = (ev) => { const b = ev.target.closest('button'); if (b) padPlay((padOct+1)*12 + +b.dataset.pc); };
+  const setOct = (d) => { padOct = clamp(padOct + d, 1, 7); $('tPadOct').textContent = padOct; if (padNote != null && refOsc) { const pc = ((padNote%12)+12)%12; stopRef(); padPlay((padOct+1)*12 + pc); } };
+  $('tPadDown').onclick = () => setOct(-1); $('tPadUp').onclick = () => setOct(1);
 }
 /* practice clock: this session and today's total (kept in this browser) */
 const todayKey = () => 'practice-coach-time-' + new Date().toISOString().slice(0, 10);
@@ -419,7 +441,7 @@ function updatePracticeClock(){
 setInterval(updatePracticeClock, 1000);
 function setModeUI(){
   const free = mode === 'free';
-  if (!free) noScore = false;
+  if (!free) { noScore = false; document.body.classList.remove('ns-mode'); padMark(); }
   $('modeLabel').textContent = !free ? '분석 모드 · MusicXML' : noScore ? '개인 연습 · 악보 없이' : '자유 연습 모드 · 보기 전용 악보';
   $('rangeGroup').hidden = free; if (free) $('partGroup').hidden = true;
   $('metroBtn').hidden = !free; $('freeGroup').hidden = !free;
@@ -428,7 +450,7 @@ function setModeUI(){
   $('omrLink').hidden = !free || noScore;
   if (free && !noScore) flash('PDF·사진 악보는 보기 전용이에요. 악보 위의 [악보 인식기로 변환]을 누르면 MusicXML로 바꿔 예시 듣기와 분석을 쓸 수 있어요.');
   $('noteLegend').hidden = true;
-  $('tTarget').style.visibility = free ? 'hidden' : 'visible';
+  $('tTarget').style.visibility = free && !noScore ? 'hidden' : 'visible';
 }
 
 /* ---------------- file loading ---------------- */
@@ -1700,7 +1722,7 @@ function initScoreMenu(){
 }
 async function boot(){
   if (window.claude) document.body.classList.add('nomic');
-  bindSettings(); initSettingsPopover(); initScoreMenu(); drawGaugeTicks(); initSongs();
+  bindSettings(); initSettingsPopover(); initScoreMenu(); initNotePad(); drawGaugeTicks(); initSongs();
   try { pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([$('pdfWorkerSrc').textContent], { type:'text/javascript' })); } catch(e) {}
   initOSMD();
   loadNoScore();
