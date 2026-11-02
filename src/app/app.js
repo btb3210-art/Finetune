@@ -375,7 +375,7 @@ function loadNoScore(){
   $('nsTuner').onclick = toggleTuner; setTuner(tunerOnly);
   $('nsVol').addEventListener('input', () => { S.vol = parseFloat($('nsVol').value); saveSettings(); syncVol(); }); syncVol(); renderLiveNotes(null);
   $('nsPractice').onclick = () => $('playBtn').click(); updateMetroUI();
-  $('nsSub').value = S.subdiv; $('nsSub').onchange = () => { S.subdiv = +$('nsSub').value; saveSettings(); };
+  $('nsSub').value = S.subdiv; $('nsSub').onchange = () => { S.subdiv = +$('nsSub').value; saveSettings(); markSub(); };
   const taps = []; $('nsTap').onclick = () => { const t = performance.now(); if (taps.length && t - taps[taps.length-1] > 2000) taps.length = 0; taps.push(t); if (taps.length > 6) taps.shift();
     if (taps.length >= 3) { const iv = []; for (let k = 1; k < taps.length; k++) iv.push(taps[k] - taps[k-1]); setBpm(60000 / median(iv)); } };
   $('refStep').innerHTML = SOLFA.map((n, k) => `<option value="${k}">${n} (${NAMES[k]})</option>`).join('');
@@ -630,7 +630,7 @@ document.addEventListener('click', async (ev) => {
 function readAs(file, kind){ return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; if (kind==='binary') r.readAsBinaryString(file); else r.readAsText(file); }); }
 $('viewSel').addEventListener('change', async () => { viewAll = $('viewSel').value === 'all'; setTimeout(rememberSongSoon, 0); if (session) stopAll(false); clearNoteColors(); await applyPart(partIdx, false); flash(viewAll ? `전체 스코어를 보여 줘요. 커서·분석·예시는 '${(osmd.Sheet.Instruments[partIdx].Name||'').trim()}' 파트 기준이에요.` : '고른 파트만 보여 줘요.'); });
 $('partSel').addEventListener('change', async () => { if (session) stopAll(false); clearNoteColors(); await applyPart(+$('partSel').value, false); rememberSongSoon(); });
-$('moreBtn').onclick = () => { const r = document.querySelector('.rail'); r.classList.toggle('open'); $('moreBtn').textContent = r.classList.contains('open') ? '설정 접기 ▴' : '구간·메트로놈·설정 ▾'; };
+$('moreBtn').onclick = () => { const r = $('moreBtn').closest('.rail'); r.classList.toggle('open'); $('moreBtn').textContent = r.classList.contains('open') ? '설정 접기 ▴' : '구간·메트로놈·설정 ▾'; };
 $('noScoreBtn').onclick = () => { curSongId = null; curBuiltin = null; loadNoScore(); renderSongs(); };
 $('songsBtn').onclick = () => openDrawer();
 $('tabMine').onclick = () => { drawerTab = 'mine'; renderSongs(); }; $('tabBuiltin').onclick = () => { drawerTab = 'builtin'; renderSongs(); }; $('songClose').onclick = closeDrawer; $('songSearch').addEventListener('input', renderSongs);
@@ -1720,9 +1720,27 @@ function initScoreMenu(){
   const sync = () => { $('curTitle').textContent = $('fileName').textContent; };
   new MutationObserver(sync).observe($('fileName'), { childList: true, characterData: true, subtree: true }); sync();
 }
+// eighth / sixteenth buttons beside the tempo: metronome subdivision, tap again to turn off
+function markSub(){ document.querySelectorAll('.sub-btn').forEach(b => { const on = +b.dataset.sub === +S.subdiv; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }); if ($('nsSub')) $('nsSub').value = S.subdiv; }
+function initSubButtons(){
+  document.querySelectorAll('.sub-btn').forEach(b => b.onclick = () => { const v = +b.dataset.sub; S.subdiv = +S.subdiv === v ? 1 : v; saveSettings(); markSub(); });
+  markSub();
+}
+// phone: tempo, start, metronome/tuner buttons stay on top; example playback and settings move below the tuner
+function initPhoneLayout(){
+  const ids = ['rangeGroup','freeGroup','metroGroup','demoGroup','moreBtn','settings'];
+  const marks = ids.map(id => { const c = document.createComment(id); $(id).before(c); return c; });
+  const mq = window.matchMedia('(max-width:700px)');
+  const apply = () => {
+    if (mq.matches) ids.forEach(id => $('rail2').appendChild($(id)));
+    else ids.forEach((id, k) => marks[k].after($(id)));
+  };
+  if (mq.addEventListener) mq.addEventListener('change', apply); else mq.addListener(apply);
+  apply();
+}
 async function boot(){
   if (window.claude) document.body.classList.add('nomic');
-  bindSettings(); initSettingsPopover(); initScoreMenu(); initNotePad(); drawGaugeTicks(); initSongs();
+  bindSettings(); initSettingsPopover(); initScoreMenu(); initNotePad(); initSubButtons(); initPhoneLayout(); drawGaugeTicks(); initSongs();
   try { pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([$('pdfWorkerSrc').textContent], { type:'text/javascript' })); } catch(e) {}
   initOSMD();
   loadNoScore();
