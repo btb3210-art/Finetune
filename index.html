@@ -132,6 +132,24 @@ details.settings.placed > .settings-panel{position:fixed;right:auto}
 .tuner-status{text-align:center;font-size:14px;font-weight:700;min-height:20px;margin-top:2px;color:var(--ink-2)}
 .tuner-status[data-k=ok]{color:var(--good)} .tuner-status[data-k=sharp]{color:var(--sharp)} .tuner-status[data-k=flat]{color:var(--flat)} .tuner-status[data-k=demo]{color:var(--accent)}
 .cur-title,.menu-btn,.menu-backdrop{display:none}
+.toast{position:fixed;z-index:50;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);padding:12px 14px;border-radius:12px;background:var(--ink);color:var(--surface);font-size:14px;line-height:1.5;box-shadow:0 8px 24px rgba(10,20,40,.3)}
+.toast.err{background:var(--bad);color:#fff}
+.rail2{display:none}
+.sub-btns{display:inline-flex;gap:4px;margin-left:4px}
+.sub-btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:3px 8px;min-width:64px}
+.sub-btn svg,.rp-grid svg{height:26px;fill:currentColor;display:block}
+.sub-btn svg text,.rp-grid svg text{fill:currentColor}
+.sub-btn .rb-caret{font-size:11px;opacity:.7}
+.sub-btn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.rp-back{position:fixed;inset:0;z-index:44}
+.rhythm-pop{position:fixed;z-index:45;width:min(400px,calc(100vw - 24px));background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px;box-shadow:0 12px 32px rgba(10,20,40,.25)}
+.rp-head{display:flex;align-items:baseline;gap:8px;margin-bottom:10px;font-size:14px}
+.rp-head small{color:var(--ink-3);font-size:12px}
+.rp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:6px}
+.rp-grid button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 4px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink);cursor:pointer;touch-action:manipulation}
+.rp-grid button small{font-size:11px;color:var(--ink-2);text-align:center;line-height:1.25}
+.rp-grid button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.rp-grid button.on small{color:var(--accent-ink)}
 .tpad{margin-top:10px;border-top:1px solid var(--line);padding-top:10px;display:flex;gap:6px;align-items:stretch}
 .tpad-keys{flex:1;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
 .tkey{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:8px 0;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink);cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none;min-width:0}
@@ -314,6 +332,25 @@ svg rect.mhot.tap2{fill:rgba(43,89,195,.30)}
   .rail .go{width:100%;flex-wrap:wrap;margin-left:0}
   .rail .go .btn{flex:1 1 auto}
   .rail .go #playBtn{flex:1 1 100%;padding-block:12px;font-size:16px}
+  /* top card: [− tempo +][연습 시작] / [slider][♫][♬] / [메트로놈][튜너]; the rest sits below the tuner (#rail2) */
+  .rail:not(.rail2){display:grid;grid-template-columns:44px 64px 44px minmax(0,1fr) auto;gap:8px 6px;align-items:center;
+    grid-template-areas:"part part part part part" "label label label label label" "down bpm up play play" "range range range range sub" "metro metro metro tuner tuner"}
+  .rail #partGroup{grid-area:part}
+  .rail #tempoGroup,.rail #tempoGroup > .row,.rail .go{display:contents}
+  .rail #tempoGroup > .glabel{grid-area:label;margin-bottom:-4px}
+  .rail #bpmDown{grid-area:down;height:44px} .rail #bpmUp{grid-area:up;height:44px}
+  .rail #bpm{grid-area:bpm;width:100%;height:44px;font-size:24px}
+  .rail .go #playBtn{grid-area:play;align-self:stretch;margin:0}
+  .rail input[type=range]#bpmRange{grid-area:range;width:100%}
+  .rail .sub-btns{grid-area:sub;margin:0}
+  .rail .sub-btn{height:36px;min-width:84px}
+  .rail .go #metroBtn{grid-area:metro}
+  .rail .go #tunerBtn{grid-area:tuner}
+  .rail .go #metroBtn[hidden] + #tunerBtn{grid-column:1/-1}
+  body.nomic .rail .go #metroBtn{grid-column:1/-1}
+  .rail .go .btn{padding-block:10px}
+  .rail2{display:flex;flex-direction:column;align-items:stretch;order:-1}
+  .rail2 > .group,.rail2 > details{width:100%}
   /* big tuner: note and cents on the left, gauge on the right, status line below; beat row under it */
   .side{grid-template-columns:minmax(0,1fr)}
   .side .card.tuner{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"target target" "note gauge" "cents gauge" "status status" "meta meta";align-items:center;gap:0 10px}
@@ -497,6 +534,12 @@ body.nomic .ns-notes{display:none}
     <button class="menu-btn" id="menuBtn" type="button" aria-label="악보 메뉴" aria-expanded="false" aria-controls="scoreGroup"><span></span><span></span><span></span></button>
   </header>
   <div class="menu-backdrop" id="menuBackdrop"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <div class="rp-back" id="rhythmBack" hidden></div>
+  <div class="rhythm-pop" id="rhythmPop" role="dialog" aria-label="메트로놈 리듬 고르기" hidden>
+    <div class="rp-head"><b>메트로놈 리듬</b><small>한 박을 이렇게 쪼개서 울려요</small></div>
+    <div class="rp-grid" id="rhythmGrid"></div>
+  </div>
 
   <section class="rail" aria-label="연습 설정">
     <div class="group score-group" id="scoreGroup">
@@ -530,16 +573,19 @@ body.nomic .ns-notes{display:none}
         </select>
       </div>
     </div>
-    <div class="group">
+    <div class="group" id="tempoGroup">
       <span class="glabel">템포 (♩=)</span>
       <div class="row">
         <button class="btn sm" id="bpmDown" aria-label="템포 내리기">−</button>
         <input class="bpm" id="bpm" type="number" min="20" max="300" value="80">
         <button class="btn sm" id="bpmUp" aria-label="템포 올리기">+</button>
+        <span class="sub-btns">
+          <button class="btn sm sub-btn" id="rhythmBtn" type="button" aria-haspopup="dialog" aria-expanded="false" title="메트로놈 리듬 고르기"></button>
+        </span>
         <input type="range" id="bpmRange" min="30" max="240" value="80" aria-label="템포 슬라이더">
       </div>
     </div>
-    <div class="group more">
+    <div class="group more" id="metroGroup">
       <span class="glabel">메트로놈</span>
       <div class="row">
         <select class="inp" id="countIn" title="시작 전 예비 마디"><option value="0">예비박 없음</option><option value="1" selected>예비 1마디</option><option value="2">예비 2마디</option></select>
@@ -651,6 +697,7 @@ body.nomic .ns-notes{display:none}
         <p class="msg" id="sideMsg" style="margin:8px 0 0">이어폰으로 메트로놈을 들으면 분석이 더 정확해요.</p>
       </div>
     </aside>
+    <section class="rail rail2" id="rail2" aria-label="예시 연주와 설정"></section>
   </main>
 
   <section class="report" id="report" hidden>
@@ -1079,7 +1126,7 @@ async function loadPdf(arrBuf, name){
   mode = 'free'; setModeUI();
   const view = $('pdfView'); view.innerHTML = ''; view.hidden = false; $('osmd').hidden = true; if (osmd) { try { osmd.cursor.hide(); } catch(e){} }
   try {
-    const pdf = await pdfjsLib.getDocument({ data: arrBuf }).promise;
+    const pdf = await pdfjsLib.getDocument({ data: arrBuf, isEvalSupported: false }).promise;
     for (let p=1; p<=pdf.numPages; p++){
       const page = await pdf.getPage(p);
       const w = Math.min(1600, view.clientWidth*(window.devicePixelRatio||1)*1.2 || 1200);
@@ -1148,7 +1195,7 @@ function loadNoScore(){
   $('nsTuner').onclick = toggleTuner; setTuner(tunerOnly);
   $('nsVol').addEventListener('input', () => { S.vol = parseFloat($('nsVol').value); saveSettings(); syncVol(); }); syncVol(); renderLiveNotes(null);
   $('nsPractice').onclick = () => $('playBtn').click(); updateMetroUI();
-  $('nsSub').value = S.subdiv; $('nsSub').onchange = () => { S.subdiv = +$('nsSub').value; saveSettings(); };
+  $('nsSub').innerHTML = RHYTHMS.map(r => `<option value="${r.id}">${r.id === '1' ? '없음' : r.name}</option>`).join(''); $('nsSub').value = curRhythm().id; $('nsSub').onchange = () => { S.subdiv = $('nsSub').value; saveSettings(); markSub(); };
   const taps = []; $('nsTap').onclick = () => { const t = performance.now(); if (taps.length && t - taps[taps.length-1] > 2000) taps.length = 0; taps.push(t); if (taps.length > 6) taps.shift();
     if (taps.length >= 3) { const iv = []; for (let k = 1; k < taps.length; k++) iv.push(taps[k] - taps[k-1]); setBpm(60000 / median(iv)); } };
   $('refStep').innerHTML = SOLFA.map((n, k) => `<option value="${k}">${n} (${NAMES[k]})</option>`).join('');
@@ -1403,7 +1450,7 @@ document.addEventListener('click', async (ev) => {
 function readAs(file, kind){ return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; if (kind==='binary') r.readAsBinaryString(file); else r.readAsText(file); }); }
 $('viewSel').addEventListener('change', async () => { viewAll = $('viewSel').value === 'all'; setTimeout(rememberSongSoon, 0); if (session) stopAll(false); clearNoteColors(); await applyPart(partIdx, false); flash(viewAll ? `전체 스코어를 보여 줘요. 커서·분석·예시는 '${(osmd.Sheet.Instruments[partIdx].Name||'').trim()}' 파트 기준이에요.` : '고른 파트만 보여 줘요.'); });
 $('partSel').addEventListener('change', async () => { if (session) stopAll(false); clearNoteColors(); await applyPart(+$('partSel').value, false); rememberSongSoon(); });
-$('moreBtn').onclick = () => { const r = document.querySelector('.rail'); r.classList.toggle('open'); $('moreBtn').textContent = r.classList.contains('open') ? '설정 접기 ▴' : '구간·메트로놈·설정 ▾'; };
+$('moreBtn').onclick = () => { const r = $('moreBtn').closest('.rail'); r.classList.toggle('open'); $('moreBtn').textContent = r.classList.contains('open') ? '설정 접기 ▴' : '구간·메트로놈·설정 ▾'; };
 $('noScoreBtn').onclick = () => { curSongId = null; curBuiltin = null; loadNoScore(); renderSongs(); };
 $('songsBtn').onclick = () => openDrawer();
 $('tabMine').onclick = () => { drawerTab = 'mine'; renderSongs(); }; $('tabBuiltin').onclick = () => { drawerTab = 'builtin'; renderSongs(); }; $('songClose').onclick = closeDrawer; $('songSearch').addEventListener('input', renderSongs);
@@ -1648,7 +1695,7 @@ async function startSession(demo, opts){
   if (demo) { if (mode !== 'score' || !score) return; await ensureAudio(); startLoop(); }
   else if (!(await ensureMic())) {
     // no microphone (phone browser, claude.ai page, or permission refused): follow the score with metronome only
-    if (mode === 'free') { await ensureAudio(); startLoop(); toggleMetro(true); flash('이 화면에서는 마이크를 쓸 수 없어서 음정·박자를 셀 수 없어요. 메트로놈만 켰어요. 음은 [기준음]으로 맞춰 보세요.'); return; }
+    if (mode === 'free') { flash(window.claude ? 'Claude 앱 안에서는 마이크를 쓸 수 없어서 연습을 들을 수 없어요. 메트로놈은 [메트로놈 켜기], 음은 튜너 아래 음 버튼으로 맞춰 보세요. 튜너로 소리를 들으려면 설치한 파인튠 앱이나 웹 주소에서 여세요.' : '마이크를 쓸 수 없어서 연습을 들을 수 없어요. 마이크 사용을 허용했는지 확인해 주세요. 메트로놈은 [메트로놈 켜기]로 따로 켤 수 있어요.'); return; }
     if (mode === 'score' && !score) return;
     await ensureAudio(); startLoop(); demo = true; opts.follow = true;
   }
@@ -1701,7 +1748,7 @@ async function startSession(demo, opts){
         const k = sess.nextClick, t = sess.clickStart + k*sess.beatSec; if (t >= horizon) break;
         const b = k % sess.meter.n; const kind = b===0 ? 'acc' : (sess.meter.d===8 && b%3===0 ? 'mid':'norm');
         playClick(t, kind); sess.clicks.push({ t, k:b, n:sess.meter.n, kind, ci: t < sess.t0 - 1e-6 }); sess.nextClick++;
-        const sd = +S.subdiv || 1; for (let j = 1; j < sd; j++) playClick(t + j*sess.beatSec/sd, 'sub');
+        for (const f of rhythmOffsets()) playClick(t + f*sess.beatSec, 'sub');
       }
     }
   }, 25);
@@ -1785,7 +1832,7 @@ function metroStart(){
       const b = metro.k % n; const kind = b===0 ? 'acc' : (d===8 && b%3===0 ? 'mid' : 'norm');
       playClick(t, kind); const c = { t, k:b, n, kind }; metro.clicks.push(c); if (metro.clicks.length > 64) metro.clicks.shift();
       if (session && !session.demo && session.mode === 'free') session.clicks.push(c);
-      const sd = +S.subdiv || 1; for (let j = 1; j < sd; j++) playClick(t + j*beatSec/sd, 'sub');
+      for (const f of rhythmOffsets()) playClick(t + f*beatSec, 'sub');
       metro.k++;
     }
   }, 25);
@@ -2361,7 +2408,13 @@ function showTip(html, x, y, ms){ const t = $('tip'); t.innerHTML = html; t.hidd
 document.addEventListener('mousemove', (ev) => { const el = ev.target.closest && ev.target.closest('[data-tip]'); if (el) showTip(el.getAttribute('data-tip'), ev.clientX, ev.clientY); else if (!tipTimer || $('tip').dataset.sticky!=='1') { if (!ev.target.closest('#osmd')) $('tip').hidden = true; } });
 document.addEventListener('click', (ev) => { if (!ev.target.closest('#osmd')) $('tip').hidden = true; });
 
-function flash(text, err){ const m = $('sideMsg'); m.textContent = text; m.classList.toggle('err', !!err); }
+let toastTimer = null;
+function flash(text, err){ const m = $('sideMsg'); m.textContent = text; m.classList.toggle('err', !!err);
+  // phones hide the side card that holds this message: show it briefly at the bottom instead
+  if (!window.matchMedia('(max-width:700px)').matches) return;
+  const t = $('toast'); t.textContent = text; t.classList.toggle('err', !!err); t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, Math.min(9000, 2500 + text.length*60));
+}
 
 /* ---------------- history ---------------- */
 function loadHistory(){ try { return JSON.parse(localStorage.getItem(LS_HIST) || '[]'); } catch(e) { return []; } }
@@ -2493,9 +2546,67 @@ function initScoreMenu(){
   const sync = () => { $('curTitle').textContent = $('fileName').textContent; };
   new MutationObserver(sync).observe($('fileName'), { childList: true, characterData: true, subtree: true }); sync();
 }
+// metronome rhythm: how each beat is split (durations in 1/12 of a beat); picked from the button beside the tempo
+const RHYTHMS = [
+  { id:'1', name:'박만', d:[12] }, { id:'2', name:'8분음표', d:[6,6] }, { id:'3', name:'셋잇단음표', d:[4,4,4], tup:3 },
+  { id:'4', name:'16분음표', d:[3,3,3,3] }, { id:'d8s', name:'점8분 + 16분', d:[9,3] }, { id:'sd8', name:'16분 + 점8분', d:[3,9] },
+  { id:'8ss', name:'8분 + 16분 둘', d:[6,3,3] }, { id:'ss8', name:'16분 둘 + 8분', d:[3,3,6] }, { id:'s8s', name:'16분 + 8분 + 16분', d:[3,6,3] },
+  { id:'6', name:'6잇단음표', d:[2,2,2,2,2,2], tup:6 }
+];
+const curRhythm = () => RHYTHMS.find(r => r.id === String(S.subdiv)) || RHYTHMS[0];
+function rhythmOffsets(){ const out = []; let acc = 0; const d = curRhythm().d; for (let i = 0; i < d.length - 1; i++) { acc += d[i]; out.push(acc/12); } return out; }
+function rhythmSvg(r){
+  const n = r.d.length, step = n > 4 ? 7 : 10, w = 8 + (n-1)*step + 6, lv = (d) => d >= 12 ? 0 : (d === 3 || d === 2) ? 2 : 1;
+  const x = (i) => 4 + i*step, sx = (i) => x(i) + 2.4;
+  let g = '';
+  r.d.forEach((d, i) => { g += `<ellipse cx="${x(i)}" cy="25" rx="3.3" ry="2.4" transform="rotate(-20 ${x(i)} 25)"/><rect x="${sx(i)}" y="8" width="1.3" height="17"/>`; if (d === 9) g += `<circle cx="${x(i)+5.6}" cy="25" r="1.2"/>`; });
+  if (n > 1) {
+    g += `<rect x="${sx(0)}" y="8" width="${sx(n-1)-sx(0)+1.3}" height="2.6"/>`;
+    r.d.forEach((d, i) => { if (lv(d) < 2) return;
+      if (i+1 < n && lv(r.d[i+1]) === 2) g += `<rect x="${sx(i)}" y="12.5" width="${sx(i+1)-sx(i)+1.3}" height="2.6"/>`;
+      else if (!(i > 0 && lv(r.d[i-1]) === 2)) { const x0 = i === n-1 ? sx(i)-5 : sx(i); g += `<rect x="${x0}" y="12.5" width="6.3" height="2.6"/>`; } });
+  }
+  if (r.tup) g += `<text x="${(sx(0)+sx(n-1))/2}" y="6" font-size="7.5" font-weight="700" text-anchor="middle">${r.tup}</text>`;
+  return `<svg viewBox="0 0 ${w} 30" style="width:${w*0.9}px" aria-hidden="true">${g}</svg>`;
+}
+function markSub(){
+  const r = curRhythm();
+  $('rhythmBtn').innerHTML = rhythmSvg(r) + '<span class="rb-caret">▾</span>'; $('rhythmBtn').setAttribute('aria-label', '메트로놈 리듬: ' + r.name + ' (눌러서 바꾸기)');
+  $('rhythmBtn').classList.toggle('on', r.id !== '1');
+  document.querySelectorAll('#rhythmGrid button').forEach(b => { const on = b.dataset.r === r.id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+  if ($('nsSub')) $('nsSub').value = r.id;
+}
+function initSubButtons(){
+  const btn = $('rhythmBtn'), pop = $('rhythmPop'), back = $('rhythmBack');
+  $('rhythmGrid').innerHTML = RHYTHMS.map(r => `<button type="button" data-r="${r.id}">${rhythmSvg(r)}<small>${r.name}</small></button>`).join('');
+  const close = () => { pop.hidden = true; back.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
+  const open = () => {
+    pop.hidden = false; back.hidden = false; btn.setAttribute('aria-expanded', 'true');
+    const vw = document.documentElement.clientWidth, vh = window.innerHeight, m = 12, r = btn.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+    let left = Math.min(Math.max(m, r.right - w), vw - m - w), top = r.bottom + 6; if (top + h > vh - m) top = Math.max(m, r.top - h - 6);
+    pop.style.left = left + 'px'; pop.style.top = top + 'px';
+  };
+  btn.onclick = () => pop.hidden ? open() : close();
+  back.onclick = close;
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !pop.hidden) close(); });
+  $('rhythmGrid').onclick = (ev) => { const b = ev.target.closest('button'); if (!b) return; S.subdiv = b.dataset.r; saveSettings(); markSub(); close(); };
+  markSub();
+}
+// phone: tempo, start, metronome/tuner buttons stay on top; example playback and settings move below the tuner
+function initPhoneLayout(){
+  const ids = ['rangeGroup','freeGroup','metroGroup','demoGroup','moreBtn','settings'];
+  const marks = ids.map(id => { const c = document.createComment(id); $(id).before(c); return c; });
+  const mq = window.matchMedia('(max-width:700px)');
+  const apply = () => {
+    if (mq.matches) ids.forEach(id => $('rail2').appendChild($(id)));
+    else ids.forEach((id, k) => marks[k].after($(id)));
+  };
+  if (mq.addEventListener) mq.addEventListener('change', apply); else mq.addListener(apply);
+  apply();
+}
 async function boot(){
   if (window.claude) document.body.classList.add('nomic');
-  bindSettings(); initSettingsPopover(); initScoreMenu(); initNotePad(); drawGaugeTicks(); initSongs();
+  bindSettings(); initSettingsPopover(); initScoreMenu(); initNotePad(); initSubButtons(); initPhoneLayout(); drawGaugeTicks(); initSongs();
   try { pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([$('pdfWorkerSrc').textContent], { type:'text/javascript' })); } catch(e) {}
   initOSMD();
   loadNoScore();

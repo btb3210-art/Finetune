@@ -306,7 +306,7 @@ async function loadPdf(arrBuf, name){
   mode = 'free'; setModeUI();
   const view = $('pdfView'); view.innerHTML = ''; view.hidden = false; $('osmd').hidden = true; if (osmd) { try { osmd.cursor.hide(); } catch(e){} }
   try {
-    const pdf = await pdfjsLib.getDocument({ data: arrBuf }).promise;
+    const pdf = await pdfjsLib.getDocument({ data: arrBuf, isEvalSupported: false }).promise;
     for (let p=1; p<=pdf.numPages; p++){
       const page = await pdf.getPage(p);
       const w = Math.min(1600, view.clientWidth*(window.devicePixelRatio||1)*1.2 || 1200);
@@ -375,7 +375,7 @@ function loadNoScore(){
   $('nsTuner').onclick = toggleTuner; setTuner(tunerOnly);
   $('nsVol').addEventListener('input', () => { S.vol = parseFloat($('nsVol').value); saveSettings(); syncVol(); }); syncVol(); renderLiveNotes(null);
   $('nsPractice').onclick = () => $('playBtn').click(); updateMetroUI();
-  $('nsSub').value = S.subdiv; $('nsSub').onchange = () => { S.subdiv = +$('nsSub').value; saveSettings(); };
+  $('nsSub').innerHTML = RHYTHMS.map(r => `<option value="${r.id}">${r.id === '1' ? '없음' : r.name}</option>`).join(''); $('nsSub').value = curRhythm().id; $('nsSub').onchange = () => { S.subdiv = $('nsSub').value; saveSettings(); markSub(); };
   const taps = []; $('nsTap').onclick = () => { const t = performance.now(); if (taps.length && t - taps[taps.length-1] > 2000) taps.length = 0; taps.push(t); if (taps.length > 6) taps.shift();
     if (taps.length >= 3) { const iv = []; for (let k = 1; k < taps.length; k++) iv.push(taps[k] - taps[k-1]); setBpm(60000 / median(iv)); } };
   $('refStep').innerHTML = SOLFA.map((n, k) => `<option value="${k}">${n} (${NAMES[k]})</option>`).join('');
@@ -630,7 +630,7 @@ document.addEventListener('click', async (ev) => {
 function readAs(file, kind){ return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; if (kind==='binary') r.readAsBinaryString(file); else r.readAsText(file); }); }
 $('viewSel').addEventListener('change', async () => { viewAll = $('viewSel').value === 'all'; setTimeout(rememberSongSoon, 0); if (session) stopAll(false); clearNoteColors(); await applyPart(partIdx, false); flash(viewAll ? `전체 스코어를 보여 줘요. 커서·분석·예시는 '${(osmd.Sheet.Instruments[partIdx].Name||'').trim()}' 파트 기준이에요.` : '고른 파트만 보여 줘요.'); });
 $('partSel').addEventListener('change', async () => { if (session) stopAll(false); clearNoteColors(); await applyPart(+$('partSel').value, false); rememberSongSoon(); });
-$('moreBtn').onclick = () => { const r = document.querySelector('.rail'); r.classList.toggle('open'); $('moreBtn').textContent = r.classList.contains('open') ? '설정 접기 ▴' : '구간·메트로놈·설정 ▾'; };
+$('moreBtn').onclick = () => { const r = $('moreBtn').closest('.rail'); r.classList.toggle('open'); $('moreBtn').textContent = r.classList.contains('open') ? '설정 접기 ▴' : '구간·메트로놈·설정 ▾'; };
 $('noScoreBtn').onclick = () => { curSongId = null; curBuiltin = null; loadNoScore(); renderSongs(); };
 $('songsBtn').onclick = () => openDrawer();
 $('tabMine').onclick = () => { drawerTab = 'mine'; renderSongs(); }; $('tabBuiltin').onclick = () => { drawerTab = 'builtin'; renderSongs(); }; $('songClose').onclick = closeDrawer; $('songSearch').addEventListener('input', renderSongs);
@@ -875,7 +875,7 @@ async function startSession(demo, opts){
   if (demo) { if (mode !== 'score' || !score) return; await ensureAudio(); startLoop(); }
   else if (!(await ensureMic())) {
     // no microphone (phone browser, claude.ai page, or permission refused): follow the score with metronome only
-    if (mode === 'free') { await ensureAudio(); startLoop(); toggleMetro(true); flash('이 화면에서는 마이크를 쓸 수 없어서 음정·박자를 셀 수 없어요. 메트로놈만 켰어요. 음은 [기준음]으로 맞춰 보세요.'); return; }
+    if (mode === 'free') { flash(window.claude ? 'Claude 앱 안에서는 마이크를 쓸 수 없어서 연습을 들을 수 없어요. 메트로놈은 [메트로놈 켜기], 음은 튜너 아래 음 버튼으로 맞춰 보세요. 튜너로 소리를 들으려면 설치한 파인튠 앱이나 웹 주소에서 여세요.' : '마이크를 쓸 수 없어서 연습을 들을 수 없어요. 마이크 사용을 허용했는지 확인해 주세요. 메트로놈은 [메트로놈 켜기]로 따로 켤 수 있어요.'); return; }
     if (mode === 'score' && !score) return;
     await ensureAudio(); startLoop(); demo = true; opts.follow = true;
   }
@@ -928,7 +928,7 @@ async function startSession(demo, opts){
         const k = sess.nextClick, t = sess.clickStart + k*sess.beatSec; if (t >= horizon) break;
         const b = k % sess.meter.n; const kind = b===0 ? 'acc' : (sess.meter.d===8 && b%3===0 ? 'mid':'norm');
         playClick(t, kind); sess.clicks.push({ t, k:b, n:sess.meter.n, kind, ci: t < sess.t0 - 1e-6 }); sess.nextClick++;
-        const sd = +S.subdiv || 1; for (let j = 1; j < sd; j++) playClick(t + j*sess.beatSec/sd, 'sub');
+        for (const f of rhythmOffsets()) playClick(t + f*sess.beatSec, 'sub');
       }
     }
   }, 25);
@@ -1012,7 +1012,7 @@ function metroStart(){
       const b = metro.k % n; const kind = b===0 ? 'acc' : (d===8 && b%3===0 ? 'mid' : 'norm');
       playClick(t, kind); const c = { t, k:b, n, kind }; metro.clicks.push(c); if (metro.clicks.length > 64) metro.clicks.shift();
       if (session && !session.demo && session.mode === 'free') session.clicks.push(c);
-      const sd = +S.subdiv || 1; for (let j = 1; j < sd; j++) playClick(t + j*beatSec/sd, 'sub');
+      for (const f of rhythmOffsets()) playClick(t + f*beatSec, 'sub');
       metro.k++;
     }
   }, 25);
@@ -1588,7 +1588,13 @@ function showTip(html, x, y, ms){ const t = $('tip'); t.innerHTML = html; t.hidd
 document.addEventListener('mousemove', (ev) => { const el = ev.target.closest && ev.target.closest('[data-tip]'); if (el) showTip(el.getAttribute('data-tip'), ev.clientX, ev.clientY); else if (!tipTimer || $('tip').dataset.sticky!=='1') { if (!ev.target.closest('#osmd')) $('tip').hidden = true; } });
 document.addEventListener('click', (ev) => { if (!ev.target.closest('#osmd')) $('tip').hidden = true; });
 
-function flash(text, err){ const m = $('sideMsg'); m.textContent = text; m.classList.toggle('err', !!err); }
+let toastTimer = null;
+function flash(text, err){ const m = $('sideMsg'); m.textContent = text; m.classList.toggle('err', !!err);
+  // phones hide the side card that holds this message: show it briefly at the bottom instead
+  if (!window.matchMedia('(max-width:700px)').matches) return;
+  const t = $('toast'); t.textContent = text; t.classList.toggle('err', !!err); t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, Math.min(9000, 2500 + text.length*60));
+}
 
 /* ---------------- history ---------------- */
 function loadHistory(){ try { return JSON.parse(localStorage.getItem(LS_HIST) || '[]'); } catch(e) { return []; } }
@@ -1720,9 +1726,67 @@ function initScoreMenu(){
   const sync = () => { $('curTitle').textContent = $('fileName').textContent; };
   new MutationObserver(sync).observe($('fileName'), { childList: true, characterData: true, subtree: true }); sync();
 }
+// metronome rhythm: how each beat is split (durations in 1/12 of a beat); picked from the button beside the tempo
+const RHYTHMS = [
+  { id:'1', name:'박만', d:[12] }, { id:'2', name:'8분음표', d:[6,6] }, { id:'3', name:'셋잇단음표', d:[4,4,4], tup:3 },
+  { id:'4', name:'16분음표', d:[3,3,3,3] }, { id:'d8s', name:'점8분 + 16분', d:[9,3] }, { id:'sd8', name:'16분 + 점8분', d:[3,9] },
+  { id:'8ss', name:'8분 + 16분 둘', d:[6,3,3] }, { id:'ss8', name:'16분 둘 + 8분', d:[3,3,6] }, { id:'s8s', name:'16분 + 8분 + 16분', d:[3,6,3] },
+  { id:'6', name:'6잇단음표', d:[2,2,2,2,2,2], tup:6 }
+];
+const curRhythm = () => RHYTHMS.find(r => r.id === String(S.subdiv)) || RHYTHMS[0];
+function rhythmOffsets(){ const out = []; let acc = 0; const d = curRhythm().d; for (let i = 0; i < d.length - 1; i++) { acc += d[i]; out.push(acc/12); } return out; }
+function rhythmSvg(r){
+  const n = r.d.length, step = n > 4 ? 7 : 10, w = 8 + (n-1)*step + 6, lv = (d) => d >= 12 ? 0 : (d === 3 || d === 2) ? 2 : 1;
+  const x = (i) => 4 + i*step, sx = (i) => x(i) + 2.4;
+  let g = '';
+  r.d.forEach((d, i) => { g += `<ellipse cx="${x(i)}" cy="25" rx="3.3" ry="2.4" transform="rotate(-20 ${x(i)} 25)"/><rect x="${sx(i)}" y="8" width="1.3" height="17"/>`; if (d === 9) g += `<circle cx="${x(i)+5.6}" cy="25" r="1.2"/>`; });
+  if (n > 1) {
+    g += `<rect x="${sx(0)}" y="8" width="${sx(n-1)-sx(0)+1.3}" height="2.6"/>`;
+    r.d.forEach((d, i) => { if (lv(d) < 2) return;
+      if (i+1 < n && lv(r.d[i+1]) === 2) g += `<rect x="${sx(i)}" y="12.5" width="${sx(i+1)-sx(i)+1.3}" height="2.6"/>`;
+      else if (!(i > 0 && lv(r.d[i-1]) === 2)) { const x0 = i === n-1 ? sx(i)-5 : sx(i); g += `<rect x="${x0}" y="12.5" width="6.3" height="2.6"/>`; } });
+  }
+  if (r.tup) g += `<text x="${(sx(0)+sx(n-1))/2}" y="6" font-size="7.5" font-weight="700" text-anchor="middle">${r.tup}</text>`;
+  return `<svg viewBox="0 0 ${w} 30" style="width:${w*0.9}px" aria-hidden="true">${g}</svg>`;
+}
+function markSub(){
+  const r = curRhythm();
+  $('rhythmBtn').innerHTML = rhythmSvg(r) + '<span class="rb-caret">▾</span>'; $('rhythmBtn').setAttribute('aria-label', '메트로놈 리듬: ' + r.name + ' (눌러서 바꾸기)');
+  $('rhythmBtn').classList.toggle('on', r.id !== '1');
+  document.querySelectorAll('#rhythmGrid button').forEach(b => { const on = b.dataset.r === r.id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+  if ($('nsSub')) $('nsSub').value = r.id;
+}
+function initSubButtons(){
+  const btn = $('rhythmBtn'), pop = $('rhythmPop'), back = $('rhythmBack');
+  $('rhythmGrid').innerHTML = RHYTHMS.map(r => `<button type="button" data-r="${r.id}">${rhythmSvg(r)}<small>${r.name}</small></button>`).join('');
+  const close = () => { pop.hidden = true; back.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
+  const open = () => {
+    pop.hidden = false; back.hidden = false; btn.setAttribute('aria-expanded', 'true');
+    const vw = document.documentElement.clientWidth, vh = window.innerHeight, m = 12, r = btn.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+    let left = Math.min(Math.max(m, r.right - w), vw - m - w), top = r.bottom + 6; if (top + h > vh - m) top = Math.max(m, r.top - h - 6);
+    pop.style.left = left + 'px'; pop.style.top = top + 'px';
+  };
+  btn.onclick = () => pop.hidden ? open() : close();
+  back.onclick = close;
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !pop.hidden) close(); });
+  $('rhythmGrid').onclick = (ev) => { const b = ev.target.closest('button'); if (!b) return; S.subdiv = b.dataset.r; saveSettings(); markSub(); close(); };
+  markSub();
+}
+// phone: tempo, start, metronome/tuner buttons stay on top; example playback and settings move below the tuner
+function initPhoneLayout(){
+  const ids = ['rangeGroup','freeGroup','metroGroup','demoGroup','moreBtn','settings'];
+  const marks = ids.map(id => { const c = document.createComment(id); $(id).before(c); return c; });
+  const mq = window.matchMedia('(max-width:700px)');
+  const apply = () => {
+    if (mq.matches) ids.forEach(id => $('rail2').appendChild($(id)));
+    else ids.forEach((id, k) => marks[k].after($(id)));
+  };
+  if (mq.addEventListener) mq.addEventListener('change', apply); else mq.addListener(apply);
+  apply();
+}
 async function boot(){
   if (window.claude) document.body.classList.add('nomic');
-  bindSettings(); initSettingsPopover(); initScoreMenu(); initNotePad(); drawGaugeTicks(); initSongs();
+  bindSettings(); initSettingsPopover(); initScoreMenu(); initNotePad(); initSubButtons(); initPhoneLayout(); drawGaugeTicks(); initSongs();
   try { pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([$('pdfWorkerSrc').textContent], { type:'text/javascript' })); } catch(e) {}
   initOSMD();
   loadNoScore();

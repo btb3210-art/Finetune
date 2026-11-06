@@ -11,6 +11,12 @@
     <button class="menu-btn" id="menuBtn" type="button" aria-label="악보 메뉴" aria-expanded="false" aria-controls="scoreGroup"><span></span><span></span><span></span></button>
   </header>
   <div class="menu-backdrop" id="menuBackdrop"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <div class="rp-back" id="rhythmBack" hidden></div>
+  <div class="rhythm-pop" id="rhythmPop" role="dialog" aria-label="메트로놈 리듬 고르기" hidden>
+    <div class="rp-head"><b>메트로놈 리듬</b><small>한 박을 이렇게 쪼개서 울려요</small></div>
+    <div class="rp-grid" id="rhythmGrid"></div>
+  </div>
 
   <section class="rail" aria-label="연습 설정">
     <div class="group score-group" id="scoreGroup">
@@ -44,16 +50,19 @@
         </select>
       </div>
     </div>
-    <div class="group">
+    <div class="group" id="tempoGroup">
       <span class="glabel">템포 (♩=)</span>
       <div class="row">
         <button class="btn sm" id="bpmDown" aria-label="템포 내리기">−</button>
         <input class="bpm" id="bpm" type="number" min="20" max="300" value="80">
         <button class="btn sm" id="bpmUp" aria-label="템포 올리기">+</button>
+        <span class="sub-btns">
+          <button class="btn sm sub-btn" id="rhythmBtn" type="button" aria-haspopup="dialog" aria-expanded="false" title="메트로놈 리듬 고르기"></button>
+        </span>
         <input type="range" id="bpmRange" min="30" max="240" value="80" aria-label="템포 슬라이더">
       </div>
     </div>
-    <div class="group more">
+    <div class="group more" id="metroGroup">
       <span class="glabel">메트로놈</span>
       <div class="row">
         <select class="inp" id="countIn" title="시작 전 예비 마디"><option value="0">예비박 없음</option><option value="1" selected>예비 1마디</option><option value="2">예비 2마디</option></select>
@@ -165,6 +174,7 @@
         <p class="msg" id="sideMsg" style="margin:8px 0 0">이어폰으로 메트로놈을 들으면 분석이 더 정확해요.</p>
       </div>
     </aside>
+    <section class="rail rail2" id="rail2" aria-label="예시 연주와 설정"></section>
   </main>
 
   <section class="report" id="report" hidden>
